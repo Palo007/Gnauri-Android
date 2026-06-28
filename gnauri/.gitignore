@@ -1,0 +1,24 @@
+# OpenCode runtime data
+.omo/
+
+# Edit backups
+archive/
+
+# Docs, plans, investigation reports (not code)
+*.md
+
+# Extra schedules not referenced by the app
+/soundscapes/
+/ForestMeditation_android/
+
+# Root-level .gnaural files (duplicates of schedules/ or unreferenced)
+/baa_wind_and_waves.gnaural
+/waves.gnaural
+/zaa_default_schedule.gnaural
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# OS metadata
+Thumbs.db
+.DS_Store

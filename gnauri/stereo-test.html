@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stereo / Binaural Hardware Test</title>
+<style>
+  body{font:16px/1.5 system-ui,sans-serif;max-width:680px;margin:30px auto;padding:0 16px;background:#0e1320;color:#e6ecff}
+  button{font-size:16px;padding:12px 18px;margin:6px 0;border-radius:8px;border:1px solid #2a3650;background:#1d273d;color:#e6ecff;cursor:pointer;display:block;width:100%}
+  button:hover{border-color:#5ad1c4}
+  .out{background:#161d2e;border:1px solid #2a3650;border-radius:8px;padding:14px;margin-top:14px;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px}
+  h1{font-size:19px}
+  .k{color:#5ad1c4}
+  small{color:#8a97b8}
+</style>
+</head>
+<body>
+<h1>Stereo / Binaural Hardware Test <small>(independent of the Gnauri app)</small></h1>
+<p>Put on <b>headphones</b>. Each button isolates a known sound. Tell me what you hear and read the diagnostic box.</p>
+
+<button id="b1">1 ▶ LEFT ear only — 440 Hz for 3s</button>
+<button id="b2">2 ▶ RIGHT ear only — 440 Hz for 3s</button>
+<button id="b3">3 ▶ Binaural: 200 Hz left + 204 Hz right for 5s</button>
+<button id="b4">4 ▶ Hard pan sweep L→R (white noise) 4s</button>
+
+<div class="out" id="out">Diagnostics will appear here.</div>
+
+<script>
+let ctx;
+function ac(){
+  if(!ctx){
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    try{ if(ctx.destination.maxChannelCount>=2) ctx.destination.channelCount=2; }catch(e){}
+  }
+  if(ctx.state==="suspended") ctx.resume();
+  return ctx;
+}
+function diag(extra){
+  const c=ac();
+  const o="AudioContext sampleRate: "+c.sampleRate+
+    "\ndestination.channelCount: "+c.destination.channelCount+
+    "\ndestination.maxChannelCount: "+c.destination.maxChannelCount+
+    "\ndestination.channelCountMode: "+c.destination.channelCountMode+
+    "\ndestination.channelInterpretation: "+c.destination.channelInterpretation+
+    (extra?"\n\n"+extra:"");
+  document.getElementById("out").textContent=o;
+}
+
+// Tone isolated to one side using StereoPanner
+function side(panVal,freq,dur,label){
+  const c=ac(), t=c.currentTime;
+  const o=c.createOscillator(); o.frequency.value=freq;
+  const g=c.createGain(); g.gain.value=0.4;
+  const p=c.createStereoPanner(); p.pan.value=panVal;
+  o.connect(g).connect(p).connect(c.destination);
+  o.start(t); o.stop(t+dur);
+  diag(label+"  (pan="+panVal+")");
+}
+
+document.getElementById("b1").onclick=()=>side(-1,440,3,"TEST 1: 440 Hz hard LEFT. You should hear it ONLY in your left ear.");
+document.getElementById("b2").onclick=()=>side( 1,440,3,"TEST 2: 440 Hz hard RIGHT. You should hear it ONLY in your right ear.");
+
+document.getElementById("b3").onclick=()=>{
+  const c=ac(), t=c.currentTime, dur=5;
+  const oL=c.createOscillator(); oL.frequency.value=200;
+  const oR=c.createOscillator(); oR.frequency.value=204;
+  const gL=c.createGain(), gR=c.createGain(); gL.gain.value=gR.gain.value=0.4;
+  const pL=c.createStereoPanner(), pR=c.createStereoPanner(); pL.pan.value=-1; pR.pan.value=1;
+  oL.connect(gL).connect(pL).connect(c.destination);
+  oR.connect(gR).connect(pR).connect(c.destination);
+  oL.start(t); oR.start(t); oL.stop(t+dur); oR.stop(t+dur);
+
+  // Offline measurement of the SAME graph for ground truth
+  measure().then(r=>{
+    diag("TEST 3: 200 Hz LEFT + 204 Hz RIGHT.\n"+
+      "If channels are separate: blocking one ear gives a STEADY tone.\n"+
+      "If you hear a 4 Hz 'wow-wow' pulse in ONE ear, your output is mono.\n\n"+
+      "OFFLINE GROUND-TRUTH MEASUREMENT (same routing, rendered to a buffer):\n"+r);
+  });
+};
+
+document.getElementById("b4").onclick=()=>{
+  const c=ac(), t=c.currentTime, dur=4;
+  const buf=c.createBuffer(1,c.sampleRate*dur,c.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.3;
+  const src=c.createBufferSource(); src.buffer=buf;
+  const p=c.createStereoPanner();
+  src.connect(p).connect(c.destination);
+  p.pan.setValueAtTime(-1,t); p.pan.linearRampToValueAtTime(1,t+dur);
+  src.start(t); src.stop(t+dur);
+  diag("TEST 4: white noise sweeping LEFT → RIGHT over 4s. You should clearly hear it move across your head. If it stays centered, output is mono.");
+};
+
+// Render the binaural graph offline and measure energy per channel (ground truth, no hardware)
+async function measure(){
+  try{
+    const sr=44100, OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+    const oc=new OAC(2, sr*0.5, sr);
+    const oL=oc.createOscillator(); oL.frequency.value=200;
+    const oR=oc.createOscillator(); oR.frequency.value=204;
+    const pL=oc.createStereoPanner(), pR=oc.createStereoPanner(); pL.pan.value=-1; pR.pan.value=1;
+    const gL=oc.createGain(), gR=oc.createGain(); gL.gain.value=gR.gain.value=0.4;
+    oL.connect(gL).connect(pL).connect(oc.destination);
+    oR.connect(gR).connect(pR).connect(oc.destination);
+    oL.start(0); oR.start(0);
+    const b=await oc.startRendering();
+    const L=b.getChannelData(0), R=b.getChannelData(1);
+    const g=(dt,f)=>{const N=dt.length,k=2*Math.PI*f/sr,co=2*Math.cos(k);let s1=0,s2=0,s0;for(let i=0;i<N;i++){s0=dt[i]+co*s1-s2;s2=s1;s1=s0;}const re=s1-s2*Math.cos(k),im=s2*Math.sin(k);return Math.sqrt(re*re+im*im)/N;};
+    const L200=g(L,200),L204=g(L,204),R200=g(R,200),R204=g(R,204);
+    const ok=L200>0.05&&L204<0.005&&R204>0.05&&R200<0.005;
+    return "  L@200="+L200.toFixed(4)+"  L@204="+L204.toFixed(4)+
+           "\n  R@200="+R200.toFixed(4)+"  R@204="+R204.toFixed(4)+
+           "\n  => "+(ok?"ISOLATED (the code/render is correct; any beat you hear is from your device/OS)"
+                       :"MIXED in the render (browser-level issue)");
+  }catch(e){ return "  offline measure failed: "+e.message; }
+}
+
+diag();
+</script>
+</body>
+</html>

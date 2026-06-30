@@ -34,8 +34,8 @@
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   button,.filebtn{
     background:var(--panel2);color:var(--txt);border:1px solid var(--line);
-    border-radius:9px;padding:9px 14px;font-size:14px;cursor:pointer;
-    display:inline-flex;align-items:center;gap:7px;transition:.12s;
+    border-radius:9px;padding:9px 10px;font-size:14px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:5px;transition:.12s;
   }
   button:hover,.filebtn:hover{border-color:var(--accent);color:#fff}
   button:disabled{opacity:.4;cursor:not-allowed}
@@ -55,7 +55,10 @@
   canvas{width:100%;display:block;border-radius:8px;background:var(--panel2);touch-action:none}
   .legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:8px;flex-wrap:wrap}
   .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
-  .transport{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .transport{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+  .transport > *{flex:1;min-width:0}
+  .transport button{justify-content:center;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:38px;box-sizing:border-box}
+  .transport .balWrap button{width:100%}
   .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--dim);min-width:120px}
   .slider{display:flex;align-items:center;gap:8px;flex:1;min-width:180px}
   input[type=range]{width:100%;accent-color:var(--accent)}
@@ -216,7 +219,8 @@
     /* keep details + Repeat side by side, just tighter */
     .metaRow{gap:10px}
     .repeatCard{padding:9px 11px;min-width:184px;gap:6px}
-    .transport{gap:8px}
+    .transport{gap:6px}
+    .transport button{padding:0 4px;font-size:13px;height:36px}
     /* graph header: title + toggle stay on one line, toggle fills remaining space */
     .graphHead{gap:8px;margin-bottom:8px}
     .seg{flex:1;justify-content:stretch}
@@ -274,7 +278,7 @@
       <button id="playBtn" class="primary">▶ Play</button>
       <button id="stopBtn">⏹ Stop</button>
       <div class="balWrap">
-        <button id="balBtn" title="Adjust left/right channel balance for your headphones — remembered on this device" aria-haspopup="true" aria-expanded="false">🎚 L/R Balance</button>
+        <button id="balBtn" title="Adjust left/right channel balance for your headphones — remembered on this device" aria-haspopup="true" aria-expanded="false">🎚 Balance</button>
         <div id="balMenu" class="balMenu" role="dialog" aria-label="Left/right channel balance">
           <div class="balHead">L/R Channel Balance</div>
           <div class="balFld">
@@ -288,8 +292,11 @@
           </div>
         </div>
       </div>
-      <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾 Export .gnaural</button>
-      <div class="slider"><span class="hint nowrap">🔊</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
+      <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">📉 Fade</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾 Export</button>
+      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
     </div>
     <div class="row" style="margin-top:10px">
       <span class="time" id="timeLbl">0:00 / 0:00</span>
@@ -394,7 +401,7 @@
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2026.06.28-1530";
+const APP_VERSION = "v2026.06.30-0635";
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):
@@ -580,6 +587,7 @@ class GnauriEngine{
     this.startCtxTime=0; this.startOffset=0;
     this.schedule=null; this.segCache=[]; this.raf=null;
     this.onTick=null; this._uiVol=1; this.loopsLeft=0; this._played=0;
+    this.fadeOut30s = true;
     // decoded WAV buffers for type-2 voices, keyed by normalized filename (see _lookupBuffer)
     this.audioBuffers={};
     // noise buffer caches for white/brown noise (type 5/6), keyed by length in seconds
@@ -611,8 +619,12 @@ class GnauriEngine{
     document.addEventListener('visibilitychange', this._visHandler);
   }
   _elapsedSeconds(){
-    if(!this.running) return this._elapsedAccrued;
-    return this._elapsedAccrued + (this.ctx.currentTime - this._spanStartCtxTime);
+    if(!this.schedule) return 0;
+    const t = this.currentTime();
+    if(this.schedule.loops > 0) {
+      return (this._played * this.schedule.totalTime) + t;
+    }
+    return t;
   }
   // Equal-power crossfade curves (cos/sin), N points. up=true => 0->1, false => 1->0. Using
   // setValueCurveAtTime with these keeps perceived loudness constant across the seam (a linear
@@ -770,7 +782,7 @@ class GnauriEngine{
         this.stop();
       }
     }
-    if(!isLoopContinuation && offset===0){ this._elapsedAccrued=0; this._played=0; }
+    if(!isLoopContinuation && offset===0){ this._elapsedAccrued=0; }
     const total = this.schedule.totalTime || 1;
     offset = Math.max(0, Math.min(offset, total));
     this.startOffset = offset;
@@ -966,12 +978,36 @@ class GnauriEngine{
       }, cf*1000 + 40);
     }
 
+    const willLoop = this.loopsLeft>1;
+    if (!willLoop && this.fadeOut30s) {
+      const remaining = total - offset;
+      const fadeDuration = Math.min(30, total);
+      const fadeStartOffset = Math.max(0, total - fadeDuration);
+      const startCtx = Math.max(t0 + (xfade ? cf : 0), t0 + (fadeStartOffset - offset));
+      const endCtx = t0 + remaining;
+      if (endCtx > startCtx) {
+        try {
+          if (offset >= fadeStartOffset) {
+             const fraction = Math.max(0, 1.0 - ((offset - fadeStartOffset) / fadeDuration));
+             if (xfade) {
+               bus.gain.setValueAtTime(fraction, startCtx);
+             } else {
+               bus.gain.setValueAtTime(fraction, t0);
+             }
+             bus.gain.linearRampToValueAtTime(0, endCtx);
+          } else {
+             bus.gain.setValueAtTime(1, startCtx);
+             bus.gain.linearRampToValueAtTime(0, endCtx);
+          }
+        } catch(e) {}
+      }
+    }
+
     this._loop(total);
     // Arm the next boundary. For looping playback fire CROSSFADE seconds EARLY so the next instance
     // starts before this one ends and the two overlap — keeping the audible loop length = total.
     // Clamp so very short schedules (total <= ~2*CROSSFADE) never get a negative/tiny timer; in
     // that case fire at the true end (the start-at-0 instance just won't overlap, which is fine).
-    const willLoop = this.loopsLeft>1;
     const lead = (willLoop && (total - 2*cf) > cf) ? cf : 0;
     const timeUntilBoundary = Math.max(0.02, (total - offset) - lead);
     this._loopTimer = setTimeout(() => this._onBoundary(), timeUntilBoundary * 1000);
@@ -1085,7 +1121,10 @@ class GnauriEngine{
       if(this.loopsLeft!==Infinity) this.loopsLeft--;
       this._played++;
       this.play(0,true);
-      if (window.AndroidBridge) window.AndroidBridge.playbackStateChanged(true, 0, this.schedule.totalTime);
+      if (window.AndroidBridge) {
+        const total = this.schedule.loops > 0 ? this.schedule.totalTime * this.schedule.loops : this.schedule.totalTime;
+        window.AndroidBridge.playbackStateChanged(true, this._elapsedSeconds(), total);
+      }
       return;
     }
     this.stop(); if(this.onTick) this.onTick(this.schedule.totalTime);
@@ -1542,7 +1581,17 @@ function setupVoiceHeaders(){
 $("playBtn").onclick=()=>{
   if(!sched) return;
   if(engine.running){ engine.stop(); updateTransportUI(); }
-  else { const fresh=engine.currentTime()>=sched.totalTime; if(fresh) engine.loopsLeft=engine._loopsFromSched(); engine.play(fresh?0:engine.currentTime()); updateTransportUI(); }
+  else { 
+    const totalPlayback = sched.loops > 0 ? sched.totalTime * sched.loops : sched.totalTime;
+    const isFinished = engine._elapsedSeconds() >= totalPlayback;
+    if(isFinished) {
+      engine._played = 0;
+      engine.startOffset = 0;
+      engine.loopsLeft = engine._loopsFromSched();
+    }
+    engine.play(engine.startOffset); 
+    updateTransportUI(); 
+  }
 };
 /* ---- L/R channel balance (global, persisted on this device) ----
    A single center-detented balance control so the user can correct Left vs Right for their
@@ -1602,23 +1651,34 @@ document.addEventListener("click",e=>{
   if(!m.contains(e.target) && e.target!==$("balBtn")) toggleBalMenu(false);
 });
 $("balMenu").onclick=e=>e.stopPropagation();
+
+$("fadeBtn").onclick=()=>{
+  engine.fadeOut30s = !engine.fadeOut30s;
+  $("fadeBtn").classList.toggle("primary", engine.fadeOut30s);
+  if(engine.running) restartIfPlaying();
+};
+
 function updateTransportUI(){
   $("playBtn").textContent = engine.running ? "⏸ Pause" : "▶ Play";
-  if (window.AndroidBridge) window.AndroidBridge.playbackStateChanged(engine.running, engine.currentTime(), sched ? sched.totalTime : 0);
+  if (window.AndroidBridge) {
+    const total = sched ? (sched.loops > 0 ? sched.totalTime * sched.loops : sched.totalTime) : 0;
+    window.AndroidBridge.playbackStateChanged(engine.running, engine._elapsedSeconds(), total);
+  }
 }
 window.AndroidPlayerControl = {
   play: function() { if(sched && !engine.running) $("playBtn").click(); },
   pause: function() { if(sched && engine.running) $("playBtn").click(); },
   stop: function() { if(sched) $("stopBtn").click(); },
-  seek: function(t) { 
+  seek: function(targetTime) { 
     if(!sched) return;
-    $("seek").value = Math.round(t/(sched.totalTime||1)*1000);
+    const total = sched.loops > 0 ? sched.totalTime * sched.loops : sched.totalTime;
+    $("seek").value = Math.round(targetTime/(total||1)*1000);
     // trigger the oninput logic
     const ev = new Event('input');
     $("seek").dispatchEvent(ev);
   }
 };
-$("stopBtn").onclick=()=>{ engine.stop(); engine.startOffset=0; engine._elapsedAccrued=0; graph.setPlay(0); $("seek").value=0; $("timeLbl").textContent=fmtElapsed(0, sched?sched.totalTime:0, sched?sched.loops:0); $("liveLbl").textContent="—"; updateTransportUI(); };
+$("stopBtn").onclick=()=>{ engine.stop(); engine.startOffset=0; engine._played=0; engine._elapsedAccrued=0; graph.setPlay(0); $("seek").value=0; $("timeLbl").textContent=fmtElapsed(0, sched?sched.totalTime:0, sched?sched.loops:0); $("liveLbl").textContent="—"; updateTransportUI(); };
 // "loop X/Y" suffix for the live label: infinite => X/∞, finite>1 => X/N, single => none
 function loopSuffix(){
   const n=sched.loops; // 0 = infinite
@@ -1631,7 +1691,12 @@ engine.onTick=t=>{
   graph.setPlay(t);
   const elapsed = engine._elapsedSeconds();
   $("timeLbl").textContent = fmtElapsed(elapsed, sched.totalTime, sched.loops);
-  $("seek").value=Math.round(t/(sched.totalTime||1)*1000);
+  if (sched.loops > 0) {
+    const totalPlayback = sched.totalTime * sched.loops;
+    $("seek").value = Math.round((elapsed / (totalPlayback || 1)) * 1000);
+  } else {
+    $("seek").value = Math.round(t / (sched.totalTime || 1) * 1000);
+  }
   const tv=sched.voices.find(v=>isTone(v.type)&&!v.muted);
   if(tv){ const s=sampleVoice(buildSegments(tv),t);
     if(s){
@@ -1641,17 +1706,35 @@ engine.onTick=t=>{
   else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) $("liveLbl").textContent=`${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`+loopSuffix(); } }
   if(t>=sched.totalTime && engine.loopsLeft<=1){ updateTransportUI(); }
 };
-// Seek-elapsed semantics: elapsed keeps accruing real wall-clock playback time
-// regardless of seek position. Seeking does not reset or freeze the counter.
-// This is by design — elapsed = "time spent listening" not "playhead position".
+// Seek-elapsed semantics: elapsed tracks playhead position.
 $("seek").oninput=e=>{
   if(!sched) return;
-  const t=(+e.target.value/1000)*sched.totalTime;
-  graph.setPlay(t); $("timeLbl").textContent=fmtElapsed(engine._elapsedSeconds(), sched.totalTime, sched.loops);
+  const val = +e.target.value / 1000;
+  let t;
+  if (sched.loops > 0) {
+    const totalPlayback = sched.totalTime * sched.loops;
+    const targetElapsed = val * totalPlayback;
+    t = targetElapsed % sched.totalTime;
+    const newPlayed = Math.floor(targetElapsed / sched.totalTime);
+    engine._played = Math.min(newPlayed, sched.loops - 1);
+    engine.loopsLeft = sched.loops - engine._played;
+    if (targetElapsed >= totalPlayback) {
+       t = sched.totalTime;
+       engine.loopsLeft = 0;
+    }
+  } else {
+    t = val * sched.totalTime;
+  }
+  
   if(engine.running){ engine.stop(); engine.play(t); updateTransportUI(); }
   else { engine.startOffset=t; updateTransportUI(); }
+  
+  graph.setPlay(t); $("timeLbl").textContent=fmtElapsed(engine._elapsedSeconds(), sched.totalTime, sched.loops);
 };
-$("masterVol").oninput=e=>engine.setMasterVolume(+e.target.value/100);
+$("masterVol").oninput=e=>{
+  engine.setMasterVolume(+e.target.value/100);
+  $("volLbl").textContent=e.target.value+"%";
+};
 
 /* ---- Repeat / loop control (0 = infinite) ---- */
 // Friendly total-duration format: "45s", "6:00", "12:00", "1h 30m" for long totals.

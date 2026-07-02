@@ -296,7 +296,7 @@
     </div>
     <div class="row" style="margin-top:10px">
       <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾 Export</button>
-      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
+      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
     </div>
     <div class="row" style="margin-top:10px">
       <span class="time" id="timeLbl">0:00 / 0:00</span>
@@ -402,6 +402,47 @@
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
 const APP_VERSION = "v2026.06.30-0635";
+
+const TimerWorkerBlob = new Blob([`
+  let timers = {};
+  self.onmessage = function(e) {
+    if (e.data.cmd === 'setTimeout') {
+      timers[e.data.id] = setTimeout(() => {
+        self.postMessage({ id: e.data.id });
+      }, e.data.delay);
+    } else if (e.data.cmd === 'clearTimeout') {
+      clearTimeout(timers[e.data.id]);
+      delete timers[e.data.id];
+    }
+  };
+`], { type: 'application/javascript' });
+
+class ReliableTimer {
+  constructor() {
+    this.worker = new Worker(URL.createObjectURL(TimerWorkerBlob));
+    this.callbacks = {};
+    this.nextId = 1;
+    this.worker.onmessage = (e) => {
+      const cb = this.callbacks[e.data.id];
+      if (cb) {
+        delete this.callbacks[e.data.id];
+        cb();
+      }
+    };
+  }
+  setTimeout(cb, delay) {
+    const id = this.nextId++;
+    this.callbacks[id] = cb;
+    this.worker.postMessage({ cmd: 'setTimeout', id, delay });
+    return id;
+  }
+  clearTimeout(id) {
+    if (!id) return;
+    delete this.callbacks[id];
+    this.worker.postMessage({ cmd: 'clearTimeout', id });
+  }
+}
+const reliableTimer = new ReliableTimer();
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):
@@ -763,7 +804,7 @@ class GnauriEngine{
   play(offset=0, isLoopContinuation=false){
     this._ensureCtx();
     if(this.ctx.state==="suspended") this.ctx.resume();
-    if(this._loopTimer){ clearTimeout(this._loopTimer); this._loopTimer=null; }
+    if(this._loopTimer){ reliableTimer.clearTimeout(this._loopTimer); this._loopTimer=null; }
     const xfade = isLoopContinuation && this.running && this.CROSSFADE>0;
     if(this.running){
       if(xfade){
@@ -771,7 +812,7 @@ class GnauriEngine{
         // it keep sounding while it fades out and the new instance fades in. Its nodes are torn
         // down by a timer after the crossfade completes (_teardownInstance).
         this._elapsedAccrued += this.ctx.currentTime - this._spanStartCtxTime;
-        if(this._prevTeardownTimer){ clearTimeout(this._prevTeardownTimer); this._prevTeardownTimer=null; this._teardownInstance(this._prevNodes,this._prevBus); }
+        if(this._prevTeardownTimer){ reliableTimer.clearTimeout(this._prevTeardownTimer); this._prevTeardownTimer=null; this._teardownInstance(this._prevNodes,this._prevBus); }
         this._prevNodes = this.nodes; this._prevBus = this._bus;
         this.nodes = [];
         // detach the per-instance listeners of the outgoing graph; the new graph re-adds them below
@@ -971,7 +1012,7 @@ class GnauriEngine{
         catch(e){ pb.gain.setValueAtTime(1,t0); pb.gain.linearRampToValueAtTime(0, t0+cf); }
       }
       const prevNodes=this._prevNodes, prevBus=this._prevBus;
-      this._prevTeardownTimer = setTimeout(()=>{
+      this._prevTeardownTimer = reliableTimer.setTimeout(()=>{
         this._teardownInstance(prevNodes, prevBus);
         if(this._prevNodes===prevNodes){ this._prevNodes=null; this._prevBus=null; }
         this._prevTeardownTimer=null;
@@ -1010,7 +1051,7 @@ class GnauriEngine{
     // that case fire at the true end (the start-at-0 instance just won't overlap, which is fine).
     const lead = (willLoop && (total - 2*cf) > cf) ? cf : 0;
     const timeUntilBoundary = Math.max(0.02, (total - offset) - lead);
-    this._loopTimer = setTimeout(() => this._onBoundary(), timeUntilBoundary * 1000);
+    this._loopTimer = reliableTimer.setTimeout(() => this._onBoundary(), timeUntilBoundary * 1000);
   }
 
   // Schedule an AudioParam to follow the schedule's piecewise-linear timeline, driven by the
@@ -1134,14 +1175,14 @@ class GnauriEngine{
       this.startOffset = this.currentTime();
       this._elapsedAccrued += this.ctx.currentTime - this._spanStartCtxTime;
     }
-    if(this._loopTimer){ clearTimeout(this._loopTimer); this._loopTimer=null; }
+    if(this._loopTimer){ reliableTimer.clearTimeout(this._loopTimer); this._loopTimer=null; }
     this.running=false;
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf=null; }
     // Anti-click: fade the current instance's bus to 0 over STOP_FADE, THEN disconnect its nodes.
     // We fade the per-instance bus (not the shared master), and capture the node set locally, so a
     // new play() started during the fade is unaffected. A hard stop also flushes any previous
     // crossfade instance immediately.
-    if(this._prevTeardownTimer){ clearTimeout(this._prevTeardownTimer); this._prevTeardownTimer=null; }
+    if(this._prevTeardownTimer){ reliableTimer.clearTimeout(this._prevTeardownTimer); this._prevTeardownTimer=null; }
     this._teardownInstance(this._prevNodes, this._prevBus); this._prevNodes=null; this._prevBus=null;
     const nodes=this.nodes, bus=this._bus, fade=this.STOP_FADE;
     this.nodes=[]; this._bus=null;
@@ -1152,7 +1193,7 @@ class GnauriEngine{
         bus.gain.setValueAtTime(bus.gain.value, now);
         bus.gain.linearRampToValueAtTime(0, now+fade);
       }catch(e){}
-      setTimeout(()=>this._teardownInstance(nodes, bus), fade*1000 + 40);
+      reliableTimer.setTimeout(()=>this._teardownInstance(nodes, bus), fade*1000 + 40);
     } else {
       this._teardownInstance(nodes, bus);
     }
@@ -1734,6 +1775,11 @@ $("seek").oninput=e=>{
 $("masterVol").oninput=e=>{
   engine.setMasterVolume(+e.target.value/100);
   $("volLbl").textContent=e.target.value+"%";
+};
+$("volLbl").onclick=()=>{
+  $("masterVol").value = 100;
+  engine.setMasterVolume(1);
+  $("volLbl").textContent="100%";
 };
 
 /* ---- Repeat / loop control (0 = infinite) ---- */

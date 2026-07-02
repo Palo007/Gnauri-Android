@@ -12,16 +12,22 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 
 class MediaForegroundService : Service() {
 
     private var mediaSession: MediaSession? = null
     private var isPlaying = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MediaForegroundService::WakeLock")
+        
         mediaSession = MediaSession(this, "MediaForegroundService")
         mediaSession?.setCallback(object : MediaSession.Callback() {
             override fun onPlay() {
@@ -47,6 +53,7 @@ class MediaForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        if (wakeLock?.isHeld == true) wakeLock?.release()
         mediaSession?.release()
         super.onDestroy()
     }
@@ -68,6 +75,11 @@ class MediaForegroundService : Service() {
             }
             "UPDATE_PLAYBACK_STATE" -> {
                 isPlaying = intent.getBooleanExtra("isPlaying", false)
+                if (isPlaying) {
+                    if (wakeLock?.isHeld == false) wakeLock?.acquire()
+                } else {
+                    if (wakeLock?.isHeld == true) wakeLock?.release()
+                }
                 position = intent.getLongExtra("position", 0L)
                 duration = intent.getLongExtra("duration", 0L)
                 updateMediaSessionState()

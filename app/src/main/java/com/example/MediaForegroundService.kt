@@ -5,7 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.media.session.MediaSession
@@ -15,10 +18,36 @@ import android.os.IBinder
 import android.os.PowerManager
 
 class MediaForegroundService : Service() {
-
     private var mediaSession: MediaSession? = null
     private var isPlaying = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private var position = 0L
+    private var duration = 0L
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "UPDATE_PLAYBACK_STATE_ACTION") {
+                val newIsPlaying = intent.getBooleanExtra("isPlaying", false)
+                val wasPlaying = isPlaying
+                isPlaying = newIsPlaying
+                
+                if (isPlaying) {
+                    if (wakeLock?.isHeld == false) wakeLock?.acquire()
+                } else {
+                    if (wakeLock?.isHeld == true) wakeLock?.release()
+                }
+                
+                position = intent.getLongExtra("position", 0L)
+                duration = intent.getLongExtra("duration", 0L)
+                
+                updateMediaSessionState()
+                
+                if (wasPlaying != isPlaying) {
+                    updateNotification()
+                }
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -33,15 +62,12 @@ class MediaForegroundService : Service() {
             override fun onPlay() {
                 sendBroadcast(Intent("ACTION_PLAY_FROM_SERVICE").apply { setPackage(packageName) })
             }
-
             override fun onPause() {
                 sendBroadcast(Intent("ACTION_PAUSE_FROM_SERVICE").apply { setPackage(packageName) })
             }
-
             override fun onStop() {
                 sendBroadcast(Intent("ACTION_PAUSE_FROM_SERVICE").apply { setPackage(packageName) })
             }
-
             override fun onSeekTo(pos: Long) {
                 sendBroadcast(Intent("ACTION_SEEK_FROM_SERVICE").apply {
                     setPackage(packageName)
@@ -50,16 +76,21 @@ class MediaForegroundService : Service() {
             }
         })
         mediaSession?.isActive = true
+
+        val filter = IntentFilter("UPDATE_PLAYBACK_STATE_ACTION")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
     }
 
     override fun onDestroy() {
+        unregisterReceiver(receiver)
         if (wakeLock?.isHeld == true) wakeLock?.release()
         mediaSession?.release()
         super.onDestroy()
     }
-
-    private var position = 0L
-    private var duration = 0L
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -73,19 +104,6 @@ class MediaForegroundService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
-            "UPDATE_PLAYBACK_STATE" -> {
-                isPlaying = intent.getBooleanExtra("isPlaying", false)
-                if (isPlaying) {
-                    if (wakeLock?.isHeld == false) wakeLock?.acquire()
-                } else {
-                    if (wakeLock?.isHeld == true) wakeLock?.release()
-                }
-                position = intent.getLongExtra("position", 0L)
-                duration = intent.getLongExtra("duration", 0L)
-                updateMediaSessionState()
-                updateNotification()
-                return START_STICKY
-            }
             "ACTION_PLAY" -> {
                 sendBroadcast(Intent("ACTION_PLAY_FROM_SERVICE").apply { setPackage(packageName) })
                 return START_STICKY
@@ -95,13 +113,12 @@ class MediaForegroundService : Service() {
                 return START_STICKY
             }
         }
-
+        
         if (intent?.action == null) {
             createNotificationChannel()
             updateMediaSessionState()
             updateNotification()
         }
-
         return START_STICKY
     }
 

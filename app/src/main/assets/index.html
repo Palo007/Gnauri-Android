@@ -292,17 +292,16 @@
           </div>
         </div>
       </div>
-      <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">📉 Fade</button>
+      <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">30s Fade</button>
     </div>
     <div class="row" style="margin-top:10px">
       <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾 Export</button>
       <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
     </div>
-    <div class="row" style="margin-top:10px">
+    <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
       <span class="time" id="timeLbl">0:00 / 0:00</span>
       <div class="slider"><input id="seek" type="range" min="0" max="1000" value="0"></div>
     </div>
-    <div class="hint" id="liveLbl" style="margin-top:8px">—</div>
   </div>
 
   <div class="panel" id="voicePanel" style="display:none">
@@ -397,11 +396,11 @@
   </div>
 </div>
 
-<footer>Gnauri <span id="ver">v27</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
+<footer>Gnauri <span id="ver">v1.4</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2026.06.30-0635";
+const APP_VERSION = "v1.4";
 
 const TimerWorkerBlob = new Blob([`
   let timers = {};
@@ -1576,7 +1575,7 @@ function load(xml, name){
     $("mVoices").textContent=sched.voices.length;
     $("mDesc").textContent=sched.desc;
     renderVoices(); setupVoiceHeaders();
-    $("timeLbl").textContent=fmtElapsed(0, sched.totalTime, sched.loops);
+    $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched.totalTime, sched.loops) + "</strong>";
     $("seek").value=0; graph.setPlay(0);
     graph.setView($("viewSeg").querySelector(".on").dataset.view);
     syncLoopUI();
@@ -1719,32 +1718,32 @@ window.AndroidPlayerControl = {
     $("seek").dispatchEvent(ev);
   }
 };
-$("stopBtn").onclick=()=>{ engine.stop(); engine.startOffset=0; engine._played=0; engine._elapsedAccrued=0; graph.setPlay(0); $("seek").value=0; $("timeLbl").textContent=fmtElapsed(0, sched?sched.totalTime:0, sched?sched.loops:0); $("liveLbl").textContent="—"; updateTransportUI(); };
-// "loop X/Y" suffix for the live label: infinite => X/∞, finite>1 => X/N, single => none
-function loopSuffix(){
-  const n=sched.loops; // 0 = infinite
-  const cur=engine._played+1;
-  if(n===0) return `  ·  loop ${cur}/∞`;
-  if(n>1)   return `  ·  loop ${Math.min(cur,n)}/${n}`;
-  return "";
-}
+$("stopBtn").onclick=()=>{ engine.stop(); engine.startOffset=0; engine._played=0; engine._elapsedAccrued=0; graph.setPlay(0); $("seek").value=0; $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched?sched.totalTime:0, sched?sched.loops:0) + "</strong>"; $("loopHint").innerHTML=loopHintHTML(sched?sched.loops:0); updateTransportUI(); };
+
 engine.onTick=t=>{
   graph.setPlay(t);
   const elapsed = engine._elapsedSeconds();
-  $("timeLbl").textContent = fmtElapsed(elapsed, sched.totalTime, sched.loops);
+  const trueTotalElapsed = (engine._played * (sched.totalTime || 0)) + t;
+  
   if (sched.loops > 0) {
     const totalPlayback = sched.totalTime * sched.loops;
     $("seek").value = Math.round((elapsed / (totalPlayback || 1)) * 1000);
   } else {
     $("seek").value = Math.round(t / (sched.totalTime || 1) * 1000);
   }
+  let liveStr = "";
   const tv=sched.voices.find(v=>isTone(v.type)&&!v.muted);
   if(tv){ const s=sampleVoice(buildSegments(tv),t);
     if(s){
-      if(tv.type===0) $("liveLbl").textContent=`beat ${s.beat.toFixed(2)} Hz · carrier ${s.base.toFixed(0)} Hz · L ${(s.base-s.beat/2).toFixed(1)} / R ${(s.base+s.beat/2).toFixed(1)} Hz` + loopSuffix();
-      else $("liveLbl").textContent=`${typeName(tv.type).toLowerCase()} · pulse ${s.beat.toFixed(2)} Hz · carrier ${s.base.toFixed(0)} Hz` + loopSuffix();
+      if(tv.type===0) liveStr = `beat ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz · L ${(s.base-s.beat/2).toFixed(1)} / R ${(s.base+s.beat/2).toFixed(1)} Hz`;
+      else liveStr = `${typeName(tv.type).toLowerCase()} · pulse ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz`;
     }}
-  else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) $("liveLbl").textContent=`${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`+loopSuffix(); } }
+  else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) liveStr = `${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`; } }
+  
+  $("timeLbl").innerHTML = `<strong style="font-size:1.15em">${fmtElapsed(elapsed, sched.totalTime, sched.loops, trueTotalElapsed)}</strong>` + (liveStr ? `<span style="font-size:0.85em">  ·  ${liveStr}</span>` : "");
+  
+  $("loopHint").innerHTML = loopHintHTML(sched ? sched.loops : 0);
+  
   if(t>=sched.totalTime && engine.loopsLeft<=1){ updateTransportUI(); }
 };
 // Seek-elapsed semantics: elapsed tracks playhead position.
@@ -1770,7 +1769,19 @@ $("seek").oninput=e=>{
   if(engine.running){ engine.stop(); engine.play(t); updateTransportUI(); }
   else { engine.startOffset=t; updateTransportUI(); }
   
-  graph.setPlay(t); $("timeLbl").textContent=fmtElapsed(engine._elapsedSeconds(), sched.totalTime, sched.loops);
+  const trueTotalElapsed = (engine._played * (sched.totalTime || 0)) + t;
+  let liveStr = "";
+  const tv=sched.voices.find(v=>isTone(v.type)&&!v.muted);
+  if(tv){ const s=sampleVoice(buildSegments(tv),t);
+    if(s){
+      if(tv.type===0) liveStr = `beat ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz · L ${(s.base-s.beat/2).toFixed(1)} / R ${(s.base+s.beat/2).toFixed(1)} Hz`;
+      else liveStr = `${typeName(tv.type).toLowerCase()} · pulse ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz`;
+    }}
+  else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) liveStr = `${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`; } }
+  
+  graph.setPlay(t); 
+  $("timeLbl").innerHTML = `<strong style="font-size:1.15em">${fmtElapsed(engine._elapsedSeconds(), sched.totalTime, sched.loops, trueTotalElapsed)}</strong>` + (liveStr ? `<span style="font-size:0.85em">  ·  ${liveStr}</span>` : "");
+  $("loopHint").innerHTML=loopHintHTML(sched?sched.loops:0);
 };
 $("masterVol").oninput=e=>{
   engine.setMasterVolume(+e.target.value/100);
@@ -1791,18 +1802,31 @@ function fmtTotal(sec){
   if(h>0) return h+"h"+(m?" "+m+"m":"");
   return m+":"+String(s).padStart(2,"0");
 }
-function fmtElapsed(sec, total, loops){
+function fmtElapsed(sec, total, loops, totalPlayed){
   const elapsed = fmt(sec);
-  if(loops === 0 || !isFinite(loops)) return elapsed + " / ∞";
+  if(loops === 0 || !isFinite(loops)) {
+     if (totalPlayed !== undefined && totalPlayed > 0 ) {
+         return elapsed + " / ∞ (" + fmt(totalPlayed) + ")";
+     }
+     return elapsed + " / ∞";
+  }
   return elapsed + " / " + fmt(total * loops);
 }
 // The hint shows the ACTUAL play time (schedule duration × repeats), not the loop count.
 function loopHintHTML(n){
   const dur=sched?sched.totalTime:0;
-  if(n===0) return `<span class="lhBig">plays forever</span><span class="lhCap">loops until you stop</span>`;
+  
+  let loopStr = "";
+  if (engine && engine.running) {
+    const cur = (engine._played || 0) + 1;
+    if (n === 0) loopStr = `loop ${cur}/∞`;
+    else if (n > 1) loopStr = `loop ${Math.min(cur, n)}/${n}`;
+  }
+  
+  if(n===0) return `<span class="lhBig">plays forever</span><span class="lhCap">${loopStr || 'loops until you stop'}</span>`;
   const total=fmtTotal(dur*n);
   const times = n===1 ? "1× · "+fmtTotal(dur) : `${n}× · ${fmtTotal(dur)} each`;
-  return `<span class="lhBig">${total} total</span><span class="lhCap">${times}</span>`;
+  return `<span class="lhBig">${total} total</span><span class="lhCap">${loopStr || times}</span>`;
 }
 function syncLoopUI(){
   const inp=$("loopInput"); const n=sched?sched.loops:0;

@@ -12,9 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,6 +47,20 @@ class MainActivity : ComponentActivity() {
     
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     
+    val powerManager = getSystemService(POWER_SERVICE) as android.os.PowerManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+        try {
+          val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+          }
+          startActivity(intent)
+        } catch (e: Exception) {
+          e.printStackTrace()
+        }
+      }
+    }
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
         requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -83,47 +94,45 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WebApp(modifier: Modifier = Modifier) {
   val context = LocalContext.current
-  val fileChooserCallback = remember { mutableStateOf<android.webkit.ValueCallback<Array<Uri>>?>(null) }
-  val exportData = remember { mutableStateOf<String?>(null) }
   
   val filePickerLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.OpenMultipleDocuments()
   ) { uris ->
     if (uris != null && uris.isNotEmpty()) {
-      fileChooserCallback.value?.onReceiveValue(uris.toTypedArray())
+      WebViewManager.fileChooserCallback?.onReceiveValue(uris.toTypedArray())
     } else {
-      fileChooserCallback.value?.onReceiveValue(null)
+      WebViewManager.fileChooserCallback?.onReceiveValue(null)
     }
-    fileChooserCallback.value = null
+    WebViewManager.fileChooserCallback = null
   }
 
   val createDocumentLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.CreateDocument("*/*")
   ) { uri ->
-    if (uri != null && exportData.value != null) {
+    if (uri != null && WebViewManager.exportData != null) {
       try {
         context.contentResolver.openOutputStream(uri)?.use {
-          it.write(exportData.value!!.toByteArray())
+          it.write(WebViewManager.exportData!!.toByteArray())
         }
       } catch (e: Exception) {
         e.printStackTrace()
       }
     }
-    exportData.value = null
+    WebViewManager.exportData = null
   }
-
-  // To hold a reference to the WebView so we can call evaluateJavascript on it
-  val webViewRef = remember { mutableStateOf<WebView?>(null) }
-
+  
   DisposableEffect(context) {
+    WebViewManager.filePickerLauncher = filePickerLauncher
+    WebViewManager.createDocumentLauncher = createDocumentLauncher
+    
     val receiver = object : BroadcastReceiver() {
       override fun onReceive(context: Context?, intent: Intent?) {
         when (intent?.action) {
-          "ACTION_PLAY_FROM_SERVICE" -> webViewRef.value?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.play();", null)
-          "ACTION_PAUSE_FROM_SERVICE" -> webViewRef.value?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.pause();", null)
+          "ACTION_PLAY_FROM_SERVICE" -> WebViewManager.webView?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.play();", null)
+          "ACTION_PAUSE_FROM_SERVICE" -> WebViewManager.webView?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.pause();", null)
           "ACTION_SEEK_FROM_SERVICE" -> {
               val position = intent.getLongExtra("position", 0L)
-              webViewRef.value?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.seek(${position / 1000f});", null)
+              WebViewManager.webView?.evaluateJavascript("if(window.AndroidPlayerControl) window.AndroidPlayerControl.seek(${position / 1000f});", null)
           }
         }
       }
@@ -141,86 +150,15 @@ fun WebApp(modifier: Modifier = Modifier) {
     
     onDispose {
       context.unregisterReceiver(receiver)
+      WebViewManager.filePickerLauncher = null
+      WebViewManager.createDocumentLauncher = null
     }
   }
 
   AndroidView(
     modifier = modifier,
     factory = { ctx ->
-      WebView(ctx).apply {
-        webViewRef.value = this
-        layoutParams = ViewGroup.LayoutParams(
-          ViewGroup.LayoutParams.MATCH_PARENT,
-          ViewGroup.LayoutParams.MATCH_PARENT
-        )
-        
-        val assetLoader = androidx.webkit.WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(ctx))
-            .build()
-            
-        webViewClient = object : androidx.webkit.WebViewClientCompat() {
-            override fun shouldInterceptRequest(
-                view: WebView,
-                request: android.webkit.WebResourceRequest
-            ): android.webkit.WebResourceResponse? {
-                return assetLoader.shouldInterceptRequest(request.url)
-            }
-        }
-        webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: android.webkit.ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                fileChooserCallback.value?.onReceiveValue(null)
-                fileChooserCallback.value = filePathCallback
-                
-                val mimeTypes = arrayOf("*/*")
-                
-                try {
-                    filePickerLauncher.launch(mimeTypes)
-                } catch (e: Exception) {
-                    fileChooserCallback.value?.onReceiveValue(null)
-                    fileChooserCallback.value = null
-                    return false
-                }
-                return true
-            }
-        }
-        
-        settings.apply {
-          javaScriptEnabled = true
-          domStorageEnabled = true
-          allowFileAccess = true
-          mediaPlaybackRequiresUserGesture = false
-          mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        }
-
-        addJavascriptInterface(object {
-            @JavascriptInterface
-            fun exportFile(xml: String, filename: String) {
-                exportData.value = xml
-                createDocumentLauncher.launch(filename)
-            }
-
-            @JavascriptInterface
-            fun playbackStateChanged(isPlaying: Boolean, positionSec: Float, durationSec: Float) {
-                val intent = Intent(ctx, MediaForegroundService::class.java).apply {
-                    action = "UPDATE_PLAYBACK_STATE"
-                    putExtra("isPlaying", isPlaying)
-                    putExtra("position", (positionSec * 1000).toLong())
-                    putExtra("duration", (durationSec * 1000).toLong())
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    ctx.startForegroundService(intent)
-                } else {
-                    ctx.startService(intent)
-                }
-            }
-        }, "AndroidBridge")
-        
-        loadUrl("https://appassets.androidplatform.net/assets/index.html")
-      }
+      WebViewManager.getWebView(ctx)
     }
   )
 }

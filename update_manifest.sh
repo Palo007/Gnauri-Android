@@ -1,1 +1,0 @@
-sed -i 's/<uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>/<uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>/g' app/src/main/AndroidManifest.xml

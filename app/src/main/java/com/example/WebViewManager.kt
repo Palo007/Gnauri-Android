@@ -2,6 +2,7 @@ package com.example
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.MutableContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -15,6 +16,7 @@ import androidx.activity.result.ActivityResultLauncher
 @SuppressLint("SetJavaScriptEnabled", "StaticFieldLeak")
 object WebViewManager {
     var webView: WebView? = null
+    private var contextWrapper: MutableContextWrapper? = null
     var fileChooserCallback: android.webkit.ValueCallback<Array<Uri>>? = null
     var exportData: String? = null
     
@@ -23,8 +25,14 @@ object WebViewManager {
 
     fun getWebView(context: Context): WebView {
         val appCtx = context.applicationContext
+        if (contextWrapper == null) {
+            contextWrapper = MutableContextWrapper(context)
+        } else {
+            contextWrapper?.setBaseContext(context)
+        }
+        
         if (webView == null) {
-            webView = WebView(appCtx).apply {
+            webView = WebView(contextWrapper!!).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT

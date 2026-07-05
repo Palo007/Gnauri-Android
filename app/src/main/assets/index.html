@@ -48,6 +48,10 @@
     border-radius:9px;padding:9px 14px;font-size:14px;cursor:pointer;
     font-family:inherit;max-width:260px;
   }
+  .schedsel option{
+    background:#161d2e;
+    color:#e6ecff;
+  }
   .schedsel:hover{border-color:var(--accent);color:#fff}
   .schedsel:focus{outline:none;border-color:var(--accent)}
   .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
@@ -116,21 +120,21 @@
   .loophint .lhCap{color:var(--dim);font-size:11px}
 
   /* ---- Graph panel header: title left, view toggle right ---- */
-  .graphHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .graphHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;position:relative;z-index:10}
   .graphTitle{font-size:14px;font-weight:600;letter-spacing:.2px}
   .seg .segLbl{display:inline-flex;align-items:center;padding:0 10px;color:var(--dim);font-size:12px;background:var(--panel2);border-right:1px solid var(--line)}
 
   /* ---- Graph tooltip (HTML overlay, mobile-aware) ---- */
-  .graphWrap{position:relative}
+  .graphWrap{position:relative;z-index:20}
   #graphTip{
     position:absolute;pointer-events:none;z-index:5;
     background:rgba(14,19,32,.96);border:1px solid var(--line);
     border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;
     box-shadow:0 6px 18px rgba(0,0,0,.45);
     transform:translate(-50%,-100%);white-space:nowrap;
-    opacity:0;transition:opacity .08s;max-width:80vw;
+    opacity:0;visibility:hidden;transition:opacity .08s, visibility .08s;max-width:80vw;
   }
-  #graphTip.show{opacity:1}
+  #graphTip.show{opacity:1;visibility:visible}
   #graphTip .tt{color:var(--accent);font-weight:600;margin-bottom:3px;font-variant-numeric:tabular-nums}
   #graphTip .vrow{display:flex;align-items:center;gap:6px}
   #graphTip .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
@@ -215,7 +219,7 @@
     .meta{gap:3px 12px}
     .time{min-width:0;width:100%}
     .legend{display:none}            /* hints are inline elsewhere; reclaim the space */
-    #metaBox{margin-top:8px!important}
+    #metaBox{margin-top:3px!important}
     /* keep details + Repeat side by side, just tighter */
     .metaRow{gap:10px}
     .repeatCard{padding:9px 11px;min-width:184px;gap:6px}
@@ -231,6 +235,32 @@
     .metaRow{flex-direction:column}
     .repeatCard{flex-direction:row;align-self:stretch;justify-content:space-between;min-width:0}
   }
+  .custom-dropdown-opt {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--txt);
+    transition: background 0.12s;
+    text-align: left;
+    width: 100%;
+    background: none;
+    border: none;
+    display: block;
+    box-sizing: border-box;
+    font-family: inherit;
+    border-bottom: 1px solid var(--grid);
+  }
+  .custom-dropdown-opt:last-child {
+    border-bottom: none;
+  }
+  .custom-dropdown-opt:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  .custom-dropdown-opt.selected {
+    background: var(--accent);
+    color: #06231f;
+    font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -242,23 +272,23 @@
 <div class="wrap">
 
   <div class="panel">
-    <div class="row" style="justify-content:space-between">
-      <div class="row">
-        <label class="filebtn">📂 Load .gnaural<input id="file" type="file" multiple accept=".gnaural,.xml,.wav,audio/wav,audio/x-wav,text/xml,application/xml"></label>
-        <select id="scheduleSelect" class="schedsel" aria-label="Load a bundled schedule">
-          <option value="">📂 Load schedule…</option>
-        </select>
-      </div>
-      <span class="hint" id="status">No schedule loaded.</span>
+    <div class="row">
+      <label class="filebtn">📂 Load .gnaural<input id="file" type="file" multiple accept=".gnaural,.xml,.wav,audio/wav,audio/x-wav,text/xml,application/xml"></label>
+      <select id="scheduleSelect" class="schedsel" aria-label="Load a bundled schedule">
+        <option value="">📂 Load schedule…</option>
+      </select>
     </div>
-    <div id="dropZone" class="drop" style="margin-top:12px">Drag a <b>.gnaural</b> file (and its <b>.wav</b> files) here, or use the buttons above.<br><span class="hint">Schedules with audio-file voices need their <b>.wav</b> files selected/dropped alongside the <b>.gnaural</b>.</span></div>
-    <div id="metaBox" style="display:none;margin-top:12px">
+    <div id="loadedSection" style="margin-top:4px; display:flex; flex-direction:column; gap:0px; text-align:left; width:100%; padding:0;">
+      <span class="hint" id="status" style="display:block; text-align:left; margin:0; padding:0; width:100%;">No schedule loaded.</span>
+      <div id="mDescBox" class="hint" style="display:none; margin-top:2px; line-height:1.35; text-align:left; width:100%; padding:0;"><b style="color:var(--txt)">Description:</b> <span id="mDesc" style="white-space:pre-wrap;">—</span></div>
+    </div>
+    <div id="dropZone" class="drop" style="margin-top:8px">Drag a <b>.gnaural</b> file (and its <b>.wav</b> files) here, or use the buttons above.<br><span class="hint">Schedules with audio-file voices need their <b>.wav</b> files selected/dropped alongside the <b>.gnaural</b>.</span></div>
+    <div id="metaBox" style="display:none;margin-top:3px">
       <div class="metaRow">
         <div class="meta">
           <b>Title</b><span id="mTitle">—</span>
           <b>Duration</b><span id="mDur">—</span>
           <b>Voices</b><span id="mVoices">—</span>
-          <b>Description</b><span id="mDesc">—</span>
         </div>
         <div class="repeatCard" title="How many times to play — 0 = ∞ (loops until you stop)">
           <div class="rcTop">🔁 Repeat</div>
@@ -295,7 +325,8 @@
       <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">30s Fade</button>
     </div>
     <div class="row" style="margin-top:10px">
-      <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾 Export</button>
+      <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file">💾</button>
+      <button id="scaleTimeBtn" title="Scale the schedule duration" style="margin-left: 6px;">⏳ Scale</button>
       <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
     </div>
     <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
@@ -320,7 +351,7 @@
     <div class="graphHead">
       <span class="graphTitle">📈 Timeline</span>
       <div class="seg" id="viewSeg" title="Choose which parameter the graph shows">
-        <span class="segLbl">Show:</span>
+        <button id="undoBtn" class="btn" disabled title="Undo (Ctrl+Z)" style="border-right: 1px solid var(--line); font-size: 19px; font-weight: bold; color: #fff;">↺</button>
         <button data-view="beat" class="on">Beat</button>
         <button data-view="base">Base</button>
         <button data-view="volume">Volume</button>
@@ -337,6 +368,86 @@
     </div>
   </div>
 
+</div>
+
+<!-- Scale Schedule Time Modal -->
+<div class="modalBack" id="scaleTimeDlg" role="dialog" aria-modal="true" aria-labelledby="scaleTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="mTitle" id="scaleTitle">⏳ Scale Schedule Time</span>
+    </div>
+    <div class="modalBody">
+      <p id="scaleTimeCurrent" class="sub" style="margin-bottom:12px;"></p>
+      
+      <div class="fld">
+        <label for="scaleTimeInput">New Total Time (seconds) or Multiplier (e.g. *1.5)</label>
+        <div class="fldRow">
+          <input type="text" id="scaleTimeInput" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button id="scaleTimeCancel">Cancel</button>
+      <button id="scaleTimeApply" class="primary">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mass Adjust Points Modal -->
+<div class="modalBack" id="massEditDlg" role="dialog" aria-modal="true" aria-labelledby="massTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="mTitle" id="massTitle">🪄 Mass Adjust Points</span>
+    </div>
+    <div class="modalBody">
+      <p id="massEditStats" class="sub" style="margin-bottom:12px;"></p>
+      
+      <div class="fld" style="margin-bottom:14px; position:relative;">
+        <label>Adjust Voice</label>
+        <div class="custom-select-container" id="massEditVoiceSelectContainer" style="position: relative; width: 100%;">
+          <button type="button" id="massEditVoiceSelectBtn" style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--panel2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; text-align: left; font-family: inherit;">
+            <span id="massEditVoiceSelectLabel">Select Voice...</span>
+            <span style="font-size: 10px; color: var(--dim);">▼</span>
+          </button>
+          <div id="massEditVoiceSelectDropdown" style="display: none; position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.55);">
+            <!-- Options will be dynamically populated here -->
+          </div>
+        </div>
+      </div>
+
+      <div class="fld" style="margin-bottom:10px;">
+        <label>Adjustment Mode</label>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+          <button id="btnModeShift" class="on" style="flex:1">Shift</button>
+          <button id="btnModeRamp" style="flex:1">Ramp</button>
+        </div>
+      </div>
+      
+      <div class="fld" id="massEditShiftPane">
+        <label for="massEditDelta">Delta (can be negative)</label>
+        <div class="fldRow">
+          <input type="number" id="massEditDelta" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+        </div>
+      </div>
+      
+      <div id="massEditRampPane" style="display:none; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:10px;">
+          <div class="fld" style="flex:1">
+            <label for="massEditStart">Start Value</label>
+            <input type="number" id="massEditStart" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+          </div>
+          <div class="fld" style="flex:1">
+            <label for="massEditEnd">End Value</label>
+            <input type="number" id="massEditEnd" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button id="massEditCancel">Cancel</button>
+      <button id="massEditApply" class="primary">Apply</button>
+    </div>
+  </div>
 </div>
 
 <!-- Edit-point modal: edit beat/pulse, carrier (base), and volume of one saved datapoint -->
@@ -396,11 +507,11 @@
   </div>
 </div>
 
-<footer>Gnauri <span id="ver">v1.4</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
+<footer>Gnauri <span id="ver">v1.5</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v1.4";
+const APP_VERSION = "v1.5";
 
 const TimerWorkerBlob = new Blob([`
   let timers = {};
@@ -496,7 +607,16 @@ function parseGnaural(xmlString){
   const stereoswap = num(childText(root,["stereoswap"]), 0) === 1;
 
   // voices
-  const voiceEls = [...root.children].filter(c => c.tagName === "voice");
+  let voiceEls = [...root.children].filter(c => c.tagName === "voice");
+  if(!voiceEls.length){
+    const voicesContainer = directChild(root, "voices") || root.getElementsByTagName("voices")[0];
+    if(voicesContainer){
+      voiceEls = [...voicesContainer.children].filter(c => c.tagName === "voice");
+    }
+  }
+  if(!voiceEls.length){
+    voiceEls = [...root.getElementsByTagName("voice")];
+  }
   if(!voiceEls.length) throw new Error("No <voice> entries found.");
 
   const voices = voiceEls.map((v, vi) => {
@@ -1219,11 +1339,16 @@ class Graph{
     // Map a pointer event to a time on the timeline (or null if outside the plot area).
     // We work in CSS pixels (getBoundingClientRect) so the HTML tooltip can be positioned
     // with the same coordinate system.
-    const timeAt=(clientX)=>{
+    const timeAt=(clientX, clamp=false)=>{
       const r=canvas.getBoundingClientRect();
       const cssX=clientX-r.left;
       const {l,r:rr}=this.pad; const w=(this._w||r.width)-l-rr;
-      if(!this.sched||cssX<l||cssX>l+w) return null;
+      if(!this.sched) return null;
+      if(clamp){
+        const clampedX = Math.max(l, Math.min(l+w, cssX));
+        return (clampedX-l)/w*this.sched.totalTime;
+      }
+      if(cssX<l||cssX>l+w) return null;
       return (cssX-l)/w*this.sched.totalTime;
     };
 
@@ -1233,6 +1358,20 @@ class Graph{
     // would destroy the button the moment the mouse moves toward it (the reported bug). So while a
     // point is locked, hover only updates the dashed guide line, never the tooltip.
     canvas.addEventListener("pointermove",e=>{
+      if(this.dragStart){
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        if(!this.isDragging && (Math.abs(dx)>5 || Math.abs(dy)>5)){
+          this.isDragging = true;
+          this._hideTip();
+          this.lockT = null;
+        }
+        if(this.isDragging){
+          this.dragCurrent = { x: e.clientX, y: e.clientY, cssY: this._cssYOf(e.clientY), t: timeAt(e.clientX, true) };
+          this.draw();
+          return;
+        }
+      }
       const t=timeAt(e.clientX);
       this.hoverT=t;
       if(this.lockT!=null){ this.draw(); return; }   // pinned: keep tooltip+button untouched
@@ -1256,11 +1395,38 @@ class Graph{
     canvas.addEventListener("pointerdown",e=>{
       const t=timeAt(e.clientX);
       if(t==null){ this.lockT=null; this.lockY=null; this.selVoice=null; this._hideTip(); this.draw(); return; }
-      const cssY=this._cssYOf(e.clientY);
-      const hit=this._voiceHitAt(t,cssY);     // {voiceIndex,dist} or null
-      this.lockT=t; this.hoverT=t; this.lockY=cssY;
-      this.selVoice = hit ? hit.voiceIndex : null;
-      this._drawTip(t,true);
+      canvas.setPointerCapture(e.pointerId);
+      this.dragStart = { x: e.clientX, y: e.clientY, cssY: this._cssYOf(e.clientY), t: t };
+      this.isDragging = false;
+      this.dragCurrent = null;
+    });
+    
+    canvas.addEventListener("pointerup",e=>{
+      if(!this.dragStart) return;
+      canvas.releasePointerCapture(e.pointerId);
+      if(this.isDragging && this.dragCurrent){
+        this._handleDragEnd();
+      } else {
+        // It was a tap
+        const t = this.dragStart.t;
+        const cssY = this.dragStart.cssY;
+        const hit=this._voiceHitAt(t,cssY);     // {voiceIndex,dist} or null
+        this.lockT=t; this.hoverT=t; this.lockY=cssY;
+        this.selVoice = hit ? hit.voiceIndex : null;
+        this._drawTip(t,true);
+      }
+      this.dragStart = null;
+      this.dragCurrent = null;
+      this.isDragging = false;
+      this.draw();
+    });
+    
+    canvas.addEventListener("pointercancel",e=>{
+      if(!this.dragStart) return;
+      canvas.releasePointerCapture(e.pointerId);
+      this.dragStart = null;
+      this.dragCurrent = null;
+      this.isDragging = false;
       this.draw();
     });
   }
@@ -1282,6 +1448,19 @@ class Graph{
   // Geometry rows (one per visible voice) for the current view, used by hit-testing and selection.
   // Mirrors _readout but always yields a row for every visible voice (falls back to volume-L y when
   // the current view doesn't plot a voice, e.g. noise in beat view), so any line is selectable.
+  _handleDragEnd(){
+    console.log("Drag end called", this.dragStart, this.dragCurrent);
+    if(!this.dragStart || !this.dragCurrent) return;
+    const t1 = Math.min(this.dragStart.t, this.dragCurrent.t);
+    const t2 = Math.max(this.dragStart.t, this.dragCurrent.t);
+    const y1 = Math.min(this.dragStart.cssY, this.dragCurrent.cssY);
+    const y2 = Math.max(this.dragStart.cssY, this.dragCurrent.cssY);
+    
+    if(this.onMassEditRequest){
+      console.log("Calling onMassEditRequest", t1, t2, y1, y2);
+      this.onMassEditRequest(t1, t2, y1, y2, this.view);
+    }
+  }
   _rowsForGeometry(t){
     let rows=this._readout(t);
     const seen=new Set(rows.map(r=>r.v.index));
@@ -1358,7 +1537,16 @@ class Graph{
       if(editTarget){
         const v=this.sched.voices[editTarget.voiceIndex];
         const label = isTone(v.type) ? (v.type===0?"beat":"pulse") : "volume";
-        html+=`<button class="editbtn" id="tipEditBtn">✎ Edit ${(v.desc||("Voice "+v.index))} · ${label}</button>`;
+        html+=`<div style="display:flex; flex-direction:column; gap:4px;" 
+                 onclick="event.stopPropagation(); return false;" 
+                 onpointerdown="event.stopPropagation(); return false;"
+                 onpointerup="event.stopPropagation(); return false;"
+                 onmousedown="event.stopPropagation(); return false;"
+                 onmouseup="event.stopPropagation(); return false;"
+                 onmousemove="event.stopPropagation(); return false;">
+          <button class="editbtn" id="tipEditBtn" onpointerdown="event.stopPropagation(); return false;" onmousedown="event.stopPropagation(); return false;">✎ Edit point</button>
+          <button class="editbtn" id="tipMassEditBtn" onpointerdown="event.stopPropagation(); return false;" onmousedown="event.stopPropagation(); return false;">🪄 Mass adjust whole voice</button>
+        </div>`;
       }
       html+=`<div class="lockbadge">tap a line to select · tap empty space to clear</div>`;
     } else if(locked){
@@ -1369,8 +1557,13 @@ class Graph{
     this.tip.classList.toggle("locked",!!locked);
     if(editTarget){
       const btn=this.tip.querySelector("#tipEditBtn");
+      if(btn) btn.onpointerdown=(ev)=>{ ev.stopPropagation(); };
       if(btn) btn.onclick=(ev)=>{ ev.stopPropagation();
         if(this.onEditRequest) this.onEditRequest(editTarget.voiceIndex, editTarget.time); };
+      const massBtn=this.tip.querySelector("#tipMassEditBtn");
+      if(massBtn) massBtn.onpointerdown=(ev)=>{ ev.stopPropagation(); };
+      if(massBtn) massBtn.onclick=(ev)=>{ ev.stopPropagation();
+        if(this.onMassEditVoiceRequest) this.onMassEditVoiceRequest(editTarget.voiceIndex, this.view); };
     }
     // position: anchor centred above the point. The CSS transform lifts it fully above the
     // anchor (translate -50%,-100%) and we add an extra gap so a fingertip never covers it.
@@ -1394,16 +1587,19 @@ class Graph{
     if(this.lockT!=null) this._drawTip(this.lockT,true);
     this.draw();
   }
-  setSchedule(s){
-    this.sched=s;
-    this.lockT=null; this.hoverT=null; this.selVoice=null; this._hideTip();
-    // compute scales across all visible voices
+  recomputeScales(){
+    if(!this.sched) return;
     let maxBeat=1,maxBase=1,maxVol=0.01;
-    for(const v of s.voices){
+    for(const v of this.sched.voices){
       for(const p of v.points){ maxVol=Math.max(maxVol,p.volL,p.volR); if(isTone(v.type)){ maxBeat=Math.max(maxBeat,p.beat); maxBase=Math.max(maxBase,p.base);} }
     }
     this.maxBeat=Math.ceil(maxBeat*1.1)||1; this.maxBase=Math.ceil(maxBase*1.1)||1;
     this.maxVol=maxVol*1.1;
+  }
+  setSchedule(s){
+    this.sched=s;
+    this.lockT=null; this.hoverT=null; this.selVoice=null; this._hideTip();
+    this.recomputeScales();
     this.resize();
   }
   setPlay(t){ this.playT=t; this.draw(); }
@@ -1430,28 +1626,41 @@ class Graph{
                   : this.view==="base" ? this.maxBase
                   : 1;
     const isVolume = this.view==="volume";
+    if(this.isDragging && this.dragStart && this.dragCurrent){
+      const x1 = l + (this.dragStart.t / total) * gw;
+      const x2 = l + (this.dragCurrent.t / total) * gw;
+      const y1 = this.dragStart.cssY;
+      const y2 = this.dragCurrent.cssY;
+      c.fillStyle = "rgba(90, 209, 196, 0.2)";
+      c.strokeStyle = "rgba(90, 209, 196, 0.8)";
+      c.lineWidth = 1;
+      c.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+      c.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    }
     const narrow = (this._w||this.cv.width) < 460;   // phone-ish: thin out the labels
     // choose a "nice" step so labels are round numbers; aim for ~targetLines intervals
     const niceStep=(max,target)=>{
       const raw=max/target;
       const mag=Math.pow(10,Math.floor(Math.log10(raw)||0));
       const n=raw/mag;
-      const step = n<=1?1 : n<=2?2 : n<=5?5 : 10;
+      const step = n<=1?1 : n<=2?2 : n<=2.5?2.5 : n<=5?5 : 10;
       return step*mag;
     };
     c.fillStyle="#8a97b8"; c.textBaseline="middle";
     if(isVolume){
-      // volume: 0–100%. Phone shows 0/50/100; wider shows 0/25/50/75/100.
-      const vals = narrow ? [0,50,100] : [0,25,50,75,100];
+      // volume: 0–100%. Show 0/25/50/75/100%.
+      const vals = [0,25,50,75,100];
       for(const pctv of vals){
         const y=pt+gh-(pctv/100)*gh;
         c.strokeStyle="#212c44"; c.beginPath(); c.moveTo(l,y); c.lineTo(l+gw,y); c.stroke();
         c.fillText(pctv+"%", 6, y);
       }
     } else {
-      const target = narrow ? 4 : 5;                 // intervals; fewer on phone
+      const target = narrow ? 5 : 8;                 // intervals; fewer on phone
       const step = niceStep(axisMax||1, target) || 1;
-      const decimals = step<1 ? (step<0.1?2:1) : 0;  // beat steps can be fractional
+      const stepStr = step.toString();
+      const dotIdx = stepStr.indexOf('.');
+      const decimals = dotIdx === -1 ? 0 : stepStr.length - dotIdx - 1;
       // numbers only (the view toggle already says Beat/Base in Hz) — keeps the gutter uncluttered
       const lastTop = pt+gh-(Math.floor((axisMax+1e-6)/step)*step/(axisMax||1))*gh;
       for(let val=0; val<=axisMax+1e-6; val+=step){
@@ -1531,6 +1740,36 @@ class Graph{
         if(rrow.yR!=null) drawDot(rrow.yR); // volume view: also mark the Right curve
       }
     }
+
+    // Highlight the currently selected mass-edit points
+    if (typeof massEditState !== "undefined" && massEditState && massEditState.allHitsByVoice && massEditState.view === this.view) {
+      const activeVi = massEditState.vi;
+      const axisMax = this.view === "beat" ? this.maxBeat : this.view === "base" ? this.maxBase : 1;
+      
+      for (let [vi, hits] of massEditState.allHitsByVoice.entries()) {
+        const isActive = (activeVi === "all" || vi === activeVi);
+        const col = voiceColor(vi);
+        const fillCol = isActive ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.15)";
+        
+        hits.forEach(h => {
+          const x = this._x(h.time);
+          let pv = h.origVal;
+          if (this.view === "volume") {
+            const p = this.sched.voices[vi].points[h.index];
+            pv = p.volL;
+          }
+          const y = pt + gh - (pv / axisMax) * gh;
+          
+          c.beginPath();
+          c.arc(x, y, isActive ? 8 : 5, 0, Math.PI * 2);
+          c.fillStyle = fillCol;
+          c.fill();
+          c.lineWidth = isActive ? 2 : 1;
+          c.strokeStyle = col;
+          c.stroke();
+        });
+      }
+    }
   }
 }
 
@@ -1551,6 +1790,36 @@ const engine=new GnauriEngine();
 const graph=new Graph(document.getElementById("graph"));
 const $=id=>document.getElementById(id);
 let sched=null;
+let undoStack=[];
+
+function pushUndo() {
+  if(!sched) return;
+  undoStack.push(JSON.stringify(sched));
+  if(undoStack.length > 50) undoStack.shift();
+  const btn = $("undoBtn");
+  if(btn) btn.disabled = false;
+}
+
+function popUndo() {
+  if(undoStack.length === 0) return;
+  const stateStr = undoStack.pop();
+  const btn = $("undoBtn");
+  if(undoStack.length === 0 && btn) btn.disabled = true;
+  sched = JSON.parse(stateStr);
+  engine.setSchedule(sched); 
+  graph.setSchedule(sched);
+  renderVoices();
+  updateTransportUI();
+}
+
+const btnUndo = $("undoBtn");
+if(btnUndo) btnUndo.onclick = popUndo;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    popUndo();
+  }
+});
 
 function load(xml, name){
   try{
@@ -1573,7 +1842,12 @@ function load(xml, name){
     $("mTitle").textContent=sched.title;
     $("mDur").textContent=fmt(sched.totalTime)+" ("+Math.round(sched.totalTime)+"s)";
     $("mVoices").textContent=sched.voices.length;
-    $("mDesc").textContent=sched.desc;
+    if (sched.desc && sched.desc !== "—" && sched.desc.trim()) {
+      $("mDesc").textContent=sched.desc;
+      $("mDescBox").style.display="block";
+    } else {
+      $("mDescBox").style.display="none";
+    }
     renderVoices(); setupVoiceHeaders();
     $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched.totalTime, sched.loops) + "</strong>";
     $("seek").value=0; graph.setPlay(0);
@@ -1604,17 +1878,17 @@ function renderVoices(){
   });
   tb.querySelectorAll(".toggle").forEach(el=>el.onclick=()=>{
     const vi=+el.dataset.vi, act=el.dataset.act, v=sched.voices[vi];
-    if(act==="view"){ v.visible=!v.visible; graph.draw(); renderVoices(); return; }
+    if(act==="view"){ pushUndo(); v.visible=!v.visible; graph.draw(); renderVoices(); return; }
     // muting also hides the voice from the graph; unmuting re-shows it
-    if(act==="mute"){ v.muted=!v.muted; v.visible=!v.muted; restartIfPlaying(); graph.draw(); renderVoices(); return; }
-    if(act==="solo"){ const onlyThis=sched.voices.every((x,i)=>i===vi?!x.muted:x.muted);
+    if(act==="mute"){ pushUndo(); v.muted=!v.muted; v.visible=!v.muted; restartIfPlaying(); graph.draw(); renderVoices(); return; }
+    if(act==="solo"){ pushUndo(); const onlyThis=sched.voices.every((x,i)=>i===vi?!x.muted:x.muted);
       sched.voices.forEach((x,i)=>{ x.muted = onlyThis ? false : i!==vi; x.visible=!x.muted; }); // solo: only this audible+shown
       restartIfPlaying(); graph.draw(); renderVoices(); return; }
   });
 }
 function setupVoiceHeaders(){
-  $("viewAll").onclick=()=>{ const any=sched.voices.some(v=>!v.visible); sched.voices.forEach(v=>v.visible=any); graph.draw(); renderVoices(); };
-  $("muteAll").onclick=()=>{ const any=sched.voices.some(v=>!v.muted); sched.voices.forEach(v=>{ v.muted=any; v.visible=!v.muted; }); restartIfPlaying(); graph.draw(); renderVoices(); };
+  $("viewAll").onclick=()=>{ pushUndo(); const any=sched.voices.some(v=>!v.visible); sched.voices.forEach(v=>v.visible=any); graph.draw(); renderVoices(); };
+  $("muteAll").onclick=()=>{ pushUndo(); const any=sched.voices.some(v=>!v.muted); sched.voices.forEach(v=>{ v.muted=any; v.visible=!v.muted; }); restartIfPlaying(); graph.draw(); renderVoices(); };
 }
 
 // transport
@@ -1838,6 +2112,7 @@ function syncLoopUI(){
 }
 function setLoopCount(n){
   if(!sched) return;
+  pushUndo();
   n=Math.max(0, Math.floor(n)||0);
   engine.setLoops(n);          // updates sched.loops + live countdown
   syncLoopUI();
@@ -1849,6 +2124,7 @@ $("loopInput").onblur =()=>syncLoopUI();
 // when typing we must not overwrite the field the user is editing, so update state+hint only
 function setLoopCountKeepFocus(n){
   if(!sched) return;
+  pushUndo();
   n=Math.max(0, Math.floor(n)||0);
   engine.setLoops(n);
   $("loopInput").classList.toggle("inf", n===0);
@@ -1961,10 +2237,36 @@ async function populateScheduleMenu(){
       if(def) await loadScheduleFromPath(def);
     }
   }catch(e){
-    // Can't read the list (e.g. file:// blocks fetch). Offer the built-in sample so the menu still works.
-    const opt=document.createElement("option");
-    opt.value="__SAMPLE__"; opt.textContent="✨ Built-in sample";
-    scheduleSelect.appendChild(opt);
+    console.warn("Could not fetch schedules.json, using hardcoded fallback list", e);
+    const fallbackList = [
+      "schedules/baa_wind_and_waves.gnaural",
+      "schedules/caa_spring_rain.gnaural",
+      "schedules/daa_energize.gnaural",
+      "schedules/eaa_power_nap.gnaural",
+      "schedules/faa_problem_resolver.gnaural",
+      "schedules/gaa_dream.gnaural",
+      "schedules/haa_wakeup.gnaural",
+      "schedules/iaa_tibetan_bowls.gnaural",
+      "schedules/jaa_travel_aid.gnaural",
+      "schedules/kaa_study_time.gnaural",
+      "schedules/laa_rain_shower.gnaural",
+      "schedules/maa_babbling_brook.gnaural",
+      "schedules/naa_instant_nap.gnaural",
+      "schedules/zaa_default_schedule.gnaural"
+    ];
+    for(const path of fallbackList){
+      const opt=document.createElement("option");
+      opt.value=path; opt.textContent=prettyScheduleName(path);
+      scheduleSelect.appendChild(opt);
+    }
+    const optSample=document.createElement("option");
+    optSample.value="__SAMPLE__"; optSample.textContent="✨ Built-in sample";
+    scheduleSelect.appendChild(optSample);
+    
+    if(!sched){
+      const def=fallbackList.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
+      if(def) await loadScheduleFromPath(def);
+    }
   }
 }
 scheduleSelect.onchange=async ()=>{
@@ -2074,6 +2376,7 @@ $("edVolLink").onchange=()=>{
 $("edCancel").onclick=closeEditDialog;
 $("editBack").onclick=e=>{ if(e.target===$("editBack")) closeEditDialog(); };
 $("edApply").onclick=()=>{
+  pushUndo();
   if(editState.vi==null||editState.pi==null) return;
   const v=sched.voices[editState.vi]; const p=v.points[editState.pi]; if(!p) return;
   // write only the requested fields; preserve duration & state. Beat/carrier are only written for
@@ -2091,13 +2394,490 @@ $("edApply").onclick=()=>{
   // rebuild the engine's cached segments for this voice so playback reflects the edit
   engine.segCache[editState.vi]=buildSegments(v);
   // recompute graph scales (a higher beat/base may exceed current axis max) and redraw
-  graph.setSchedule(sched);
+  graph.recomputeScales();
   graph.draw();
   restartIfPlaying();
   closeEditDialog();
 };
 // the graph asks us to open the editor when its tooltip Edit button is tapped
 graph.onEditRequest=(vi,time)=>openEditDialog(vi,time);
+function closeScaleTimeDialog() {
+  $("scaleTimeDlg").classList.remove("show");
+}
+$("scaleTimeCancel").onclick = closeScaleTimeDialog;
+$("scaleTimeDlg").onclick = e => { if (e.target === $("scaleTimeDlg")) closeScaleTimeDialog(); };
+
+$("scaleTimeBtn").onclick = () => {
+  if (!sched || !sched.totalTime) return;
+  $("scaleTimeCurrent").textContent = "Current: " + fmt(sched.totalTime) + " (" + sched.totalTime.toFixed(1) + "s)";
+  $("scaleTimeInput").value = sched.totalTime.toFixed(1);
+  $("scaleTimeDlg").classList.add("show");
+};
+
+$("scaleTimeApply").onclick = () => {
+  pushUndo();
+  const resp = $("scaleTimeInput").value.trim();
+  if (!resp) return;
+  
+  let newTotal = 0;
+  if (resp.startsWith("*")) {
+    const factor = parseFloat(resp.substring(1));
+    if (isNaN(factor) || factor <= 0) return console.log("Invalid factor");
+    newTotal = sched.totalTime * factor;
+  } else {
+    newTotal = parseFloat(resp);
+    if (isNaN(newTotal) || newTotal <= 0) return console.log("Invalid time");
+  }
+  
+  const factor = newTotal / sched.totalTime;
+  sched.voices.forEach(v => {
+    v.points.forEach(p => {
+      p.duration *= factor;
+    });
+  });
+  sched.totalTime = newTotal;
+  
+  // Update Engine and UI
+  engine.setSchedule(sched);
+  $("mDur").textContent=fmt(sched.totalTime)+" ("+Math.round(sched.totalTime)+"s)";
+  $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(engine._played*sched.totalTime, sched.totalTime, sched.loops) + "</strong>";
+  graph.setPlay(engine._played*sched.totalTime); // approximate update
+  closeScaleTimeDialog(); restartIfPlaying();
+};
+
+// Mass Edit feature
+let massEditState = null;
+
+function closeMassEditDialog() {
+  $("massEditDlg").classList.remove("show");
+  const dd = $("massEditVoiceSelectDropdown");
+  if (dd) dd.style.display = "none";
+  massEditState = null;
+  graph.draw();
+}
+$("massEditCancel").onclick = closeMassEditDialog;
+$("massEditDlg").onclick = e => { if (e.target === $("massEditDlg")) closeMassEditDialog(); };
+
+document.addEventListener("click", e => {
+  const selectDropdown = $("massEditVoiceSelectDropdown");
+  const selectBtn = $("massEditVoiceSelectBtn");
+  if (selectDropdown && selectDropdown.style.display === "block") {
+    if (!selectDropdown.contains(e.target) && !selectBtn.contains(e.target)) {
+      selectDropdown.style.display = "none";
+    }
+  }
+});
+
+let currentMassEditMode = 'shift';
+function setMassEditMode(mode) {
+  currentMassEditMode = mode;
+  $("btnModeShift").className = mode === 'shift' ? 'on' : '';
+  $("btnModeRamp").className = mode === 'ramp' ? 'on' : '';
+  $("massEditShiftPane").style.display = mode === 'shift' ? 'block' : 'none';
+  $("massEditRampPane").style.display = mode === 'ramp' ? 'flex' : 'none';
+}
+$("btnModeShift").onclick = () => setMassEditMode('shift');
+$("btnModeRamp").onclick = () => setMassEditMode('ramp');
+setMassEditMode('shift');
+
+function insertPointAtTime(v, tNew) {
+  let time = 0;
+  for (let i = 0; i < v.points.length; i++) {
+    const p = v.points[i];
+    if (tNew > time && tNew < time + p.duration) {
+      const d1 = tNew - time;
+      const d2 = p.duration - d1;
+      const newPoint = JSON.parse(JSON.stringify(p));
+      p.duration = d1;
+      newPoint.duration = d2;
+      v.points.splice(i + 1, 0, newPoint);
+      return i + 1;
+    }
+    time += p.duration;
+  }
+  if (tNew >= time) {
+    const lastP = v.points[v.points.length - 1];
+    const newPoint = JSON.parse(JSON.stringify(lastP));
+    const extraDuration = tNew - time;
+    if (extraDuration > 0) {
+      newPoint.duration = 0;
+      lastP.duration += extraDuration;
+    } else {
+      newPoint.duration = 0;
+    }
+    v.points.push(newPoint);
+    return v.points.length - 1;
+  }
+  return -1;
+}
+
+function openMassEdit(hitsByVoice, initialVoiceIndex, view, t1, t2, isWholeVoice = false, minVal = null, maxVal = null) {
+  const selectBtn = $("massEditVoiceSelectBtn");
+  const selectDropdown = $("massEditVoiceSelectDropdown");
+  const selectLabel = $("massEditVoiceSelectLabel");
+  
+  selectDropdown.innerHTML = "";
+  selectDropdown.style.display = "none";
+
+  selectBtn.onclick = (e) => {
+    e.stopPropagation();
+    const isShown = selectDropdown.style.display === "block";
+    selectDropdown.style.display = isShown ? "none" : "block";
+  };
+
+  const getHitsForVoice = (vi) => {
+    const viNum = Number(vi);
+    if (hitsByVoice.has(viNum)) {
+      return hitsByVoice.get(viNum);
+    }
+    const v = sched.voices[viNum];
+    if (!v) return [];
+    let ptsInRect = [];
+    let time = 0;
+    if (isWholeVoice) {
+      for (let i = 0; i < v.points.length; i++) {
+        const p = v.points[i];
+        let pv = 0;
+        if (view === "beat") pv = p.beat;
+        else if (view === "base") pv = p.base;
+        else if (view === "volume") pv = p.volL;
+        ptsInRect.push({ index: i, time: time, origVal: pv });
+        time += p.duration;
+      }
+    } else {
+      if (minVal != null && maxVal != null) {
+        const axisMax = view === "beat" ? graph.maxBeat : view === "base" ? graph.maxBase : 1;
+        for (let i = 0; i < v.points.length; i++) {
+          const p = v.points[i];
+          if (time >= t1 && time <= t2) {
+            let pv = 0;
+            let inside = false;
+            if (view === "beat") {
+              pv = p.beat;
+              inside = (pv >= minVal - (axisMax * 0.08) && pv <= maxVal + (axisMax * 0.08));
+            } else if (view === "base") {
+              pv = p.base;
+              inside = (pv >= minVal - (axisMax * 0.08) && pv <= maxVal + (axisMax * 0.08));
+            } else if (view === "volume") {
+              const pvL = p.volL;
+              const pvR = p.volR;
+              const insideL = (pvL >= minVal - (axisMax * 0.08) && pvL <= maxVal + (axisMax * 0.08));
+              const insideR = (pvR >= minVal - (axisMax * 0.08) && pvR <= maxVal + (axisMax * 0.08));
+              if (insideL || insideR) {
+                inside = true;
+                pv = insideL ? pvL : pvR;
+              }
+            }
+            if (inside) {
+              ptsInRect.push({ index: i, time: time, origVal: pv });
+            }
+          }
+          time += p.duration;
+        }
+      }
+    }
+    hitsByVoice.set(viNum, ptsInRect);
+    return ptsInRect;
+  };
+
+  const validVoiceIndices = Array.from(hitsByVoice.keys()).sort((a, b) => a - b);
+
+  let bestVoice = -1;
+  const initViNum = Number(initialVoiceIndex);
+  if (initViNum !== -1 && validVoiceIndices.includes(initViNum)) {
+    bestVoice = initViNum;
+  }
+  if (bestVoice === -1 && validVoiceIndices.length > 0) {
+    let maxHits = -1;
+    validVoiceIndices.forEach((vi) => {
+      const hits = getHitsForVoice(vi);
+      if (hits.length > maxHits) {
+        maxHits = hits.length;
+        bestVoice = vi;
+      }
+    });
+  }
+  if (bestVoice === -1 && validVoiceIndices.length > 0) {
+    bestVoice = validVoiceIndices[0];
+  }
+  if (bestVoice === -1) return;
+
+  let currentSelectedVoice = bestVoice;
+
+  const updateUIForVoice = (vi) => {
+    let viewName = view;
+    if (view === "beat" && sched.voices.some(v => v.type !== 0)) viewName = "beat/pulse";
+    
+    let totalHits = 0;
+    let selectedHits = [];
+    let prefix = isWholeVoice ? "Selected ALL" : "Selected";
+    
+    if (vi === "all") {
+      for (const [vIdx, hits] of hitsByVoice.entries()) {
+        totalHits += hits.length;
+        if (selectedHits.length === 0 && hits.length > 0) {
+          selectedHits = hits;
+        }
+      }
+      $("massEditStats").textContent = `${prefix} ${totalHits} points across ${hitsByVoice.size} voices in ${viewName} view.`;
+    } else {
+      const vIndex = parseInt(vi);
+      selectedHits = getHitsForVoice(vIndex);
+      totalHits = selectedHits.length;
+      const v = sched.voices[vIndex];
+      if (!v) return;
+      const desc = (v.desc && v.desc !== '—') ? ` (${v.desc})` : '';
+      $("massEditStats").textContent = `${prefix} ${totalHits} points of voice ${vIndex+1}${desc} in ${viewName} view.`;
+    }
+    
+    if (selectedHits.length > 0) {
+      $("massEditStart").value = selectedHits[0].origVal.toFixed(view === "volume" ? 2 : 1);
+      $("massEditEnd").value = selectedHits[selectedHits.length-1].origVal.toFixed(view === "volume" ? 2 : 1);
+      $("massEditDelta").value = 0;
+    } else {
+      $("massEditStart").value = 0;
+      $("massEditEnd").value = 0;
+      $("massEditDelta").value = 0;
+    }
+    massEditState = { 
+      vi: vi, 
+      hits: selectedHits, 
+      view: view, 
+      t1: t1, 
+      t2: t2, 
+      isWholeVoice: isWholeVoice,
+      allHitsByVoice: hitsByVoice
+    };
+  };
+
+  const renderVoiceDropdown = () => {
+    selectDropdown.innerHTML = "";
+    
+    // Add individual voices
+    validVoiceIndices.forEach((vIndexNum) => {
+      const v = sched.voices[vIndexNum];
+      const optBtn = document.createElement("button");
+      optBtn.type = "button";
+      const isSelected = String(currentSelectedVoice) === String(vIndexNum);
+      optBtn.className = "custom-dropdown-opt" + (isSelected ? " selected" : "");
+      const desc = (v.desc && v.desc !== '—') ? ` (${v.desc})` : '';
+      optBtn.textContent = `Voice ${vIndexNum + 1}${desc}`;
+      optBtn.onclick = (e) => {
+        e.stopPropagation();
+        selectVoice(vIndexNum);
+        selectDropdown.style.display = "none";
+      };
+      selectDropdown.appendChild(optBtn);
+      
+      if (isSelected) {
+        selectLabel.textContent = `Voice ${vIndexNum + 1}${desc}`;
+      }
+    });
+    
+    // Add "All" option if there are multiple voices
+    if (hitsByVoice.size > 1) {
+      const optBtnAll = document.createElement("button");
+      optBtnAll.type = "button";
+      const isSelected = currentSelectedVoice === "all";
+      optBtnAll.className = "custom-dropdown-opt" + (isSelected ? " selected" : "");
+      optBtnAll.textContent = `All ${hitsByVoice.size} selected voices`;
+      optBtnAll.onclick = (e) => {
+        e.stopPropagation();
+        selectVoice("all");
+        selectDropdown.style.display = "none";
+      };
+      selectDropdown.appendChild(optBtnAll);
+      
+      if (isSelected) {
+        selectLabel.textContent = `All ${hitsByVoice.size} selected voices`;
+      }
+    }
+  };
+
+  const selectVoice = (val) => {
+    currentSelectedVoice = val;
+    renderVoiceDropdown();
+    
+    const chosenVi = val === "all" ? "all" : parseInt(val);
+    updateUIForVoice(chosenVi);
+    graph.selVoice = chosenVi === "all" ? null : chosenVi;
+    graph.draw();
+  };
+
+  updateUIForVoice(bestVoice);
+  renderVoiceDropdown();
+  graph.selVoice = bestVoice === "all" ? null : bestVoice;
+  graph.lockT = (t1 != null && t2 != null) ? (t1 + t2) / 2 : null;
+  $("massEditDlg").classList.add("show");
+  setMassEditMode('shift');
+  graph.draw();
+}
+
+graph.onMassEditVoiceRequest = (vi, view) => {
+  if (!sched) return;
+  const hitsByVoice = new Map();
+  sched.voices.forEach(v => {
+    if (!v.visible) return;
+    let ptsInRect = [];
+    let time = 0;
+    for(let i=0; i<v.points.length; i++) {
+      const p = v.points[i];
+      let pv = 0;
+      if (view === "beat") pv = p.beat;
+      else if (view === "base") pv = p.base;
+      else if (view === "volume") pv = p.volL;
+      
+      ptsInRect.push({index: i, time: time, origVal: pv});
+      time += p.duration;
+    }
+    if (ptsInRect.length > 0) {
+      hitsByVoice.set(Number(v.index), ptsInRect);
+    }
+  });
+
+  if (hitsByVoice.size === 0) return;
+  openMassEdit(hitsByVoice, vi, view, 0, sched.totalTime, true);
+};
+
+graph.onMassEditRequest = (t1, t2, y1, y2, view) => {
+  if (!sched) return;
+  const hitsByVoice = new Map();
+  const axisMax = view === "beat" ? graph.maxBeat : view === "base" ? graph.maxBase : 1;
+  const H = graph._h || graph.cv.height;
+  const {t:pt, b} = graph.pad;
+  const gh = H - pt - b;
+  const val1 = (pt + gh - y1) / gh * (axisMax||1);
+  const val2 = (pt + gh - y2) / gh * (axisMax||1);
+  const minVal = Math.min(val1, val2);
+  const maxVal = Math.max(val1, val2);
+  
+  const tPad = (8 / (graph._w || graph.cv.width)) * (sched.totalTime || 1);
+  sched.voices.forEach(v => {
+    if (!v.visible) return;
+    let ptsInRect = [];
+    let time = 0;
+    for(let i=0; i<v.points.length; i++) {
+      const p = v.points[i];
+      if (time >= t1 - tPad && time <= t2 + tPad) {
+        let pv = 0;
+        let inside = false;
+        if (view === "beat") {
+          pv = p.beat;
+          inside = (pv >= minVal - (axisMax * 0.15) && pv <= maxVal + (axisMax * 0.15));
+        } else if (view === "base") {
+          pv = p.base;
+          inside = (pv >= minVal - (axisMax * 0.15) && pv <= maxVal + (axisMax * 0.15));
+        } else if (view === "volume") {
+          const pvL = p.volL;
+          const pvR = p.volR;
+          const insideL = (pvL >= minVal - (axisMax * 0.15) && pvL <= maxVal + (axisMax * 0.15));
+          const insideR = (pvR >= minVal - (axisMax * 0.15) && pvR <= maxVal + (axisMax * 0.15));
+          if (insideL || insideR) {
+            inside = true;
+            pv = insideL ? pvL : pvR;
+          }
+        }
+        if (inside) {
+          ptsInRect.push({index: i, time: time, origVal: pv});
+        }
+      }
+      time += p.duration;
+    }
+    if (ptsInRect.length > 0) {
+      hitsByVoice.set(Number(v.index), ptsInRect);
+    }
+  });
+  if (hitsByVoice.size === 0) return;
+  openMassEdit(hitsByVoice, -1, view, t1, t2, false, minVal, maxVal);
+};
+
+$("massEditApply").onclick = () => {
+  pushUndo();
+  if(!massEditState || !sched) return;
+  const { vi, hits, view, allHitsByVoice } = massEditState;
+  const mode = currentMassEditMode;
+
+  const applyToVoice = (vIndexNum, voiceHits) => {
+    const v = sched.voices[vIndexNum];
+    if (!v) return;
+    
+    if (mode === "shift") {
+      const delta = parseFloat($("massEditDelta").value);
+      if(isNaN(delta)) return;
+      voiceHits.forEach(h => {
+        const p = v.points[h.index];
+        if (view === "beat") p.beat = Math.max(0, p.beat + delta);
+        else if (view === "base") p.base = Math.max(0, p.base + delta);
+        else if (view === "volume") {
+          p.volL = clamp(p.volL + delta, 0, 1);
+          p.volR = clamp(p.volR + delta, 0, 1);
+        }
+      });
+    } else if (mode === "ramp") {
+      const startVal = parseFloat($("massEditStart").value);
+      const endVal = parseFloat($("massEditEnd").value);
+      if(isNaN(startVal) || isNaN(endVal)) return;
+      
+      if (voiceHits.length === 0) {
+        // do nothing
+      } else if (voiceHits.length === 1) {
+        const p0 = v.points[voiceHits[0].index];
+        const tStart = voiceHits[0].time;
+        let tEnd = massEditState.t2;
+        if (tEnd == null || tEnd <= tStart) {
+          tEnd = tStart + p0.duration;
+        }
+        if (tEnd <= tStart) {
+          tEnd = tStart + 60;
+        }
+        const newIdx = insertPointAtTime(v, tEnd);
+        if (newIdx !== -1) {
+          const pStart = v.points[voiceHits[0].index];
+          const pEnd = v.points[newIdx];
+          if (view === "beat") {
+            pStart.beat = Math.max(0, startVal);
+            pEnd.beat = Math.max(0, endVal);
+          } else if (view === "base") {
+            pStart.base = Math.max(0, startVal);
+            pEnd.base = Math.max(0, endVal);
+          } else if (view === "volume") {
+            pStart.volL = clamp(startVal, 0, 1);
+            pStart.volR = clamp(startVal, 0, 1);
+            pEnd.volL = clamp(endVal, 0, 1);
+            pEnd.volR = clamp(endVal, 0, 1);
+          }
+        }
+      } else {
+        const tStart = voiceHits[0].time;
+        const tEnd = voiceHits[voiceHits.length-1].time;
+        const tSpan = tEnd - tStart;
+        voiceHits.forEach(h => {
+          const p = v.points[h.index];
+          const progress = tSpan > 0 ? (h.time - tStart) / tSpan : 0;
+          const newVal = startVal + (endVal - startVal) * progress;
+          if (view === "beat") p.beat = Math.max(0, newVal);
+          else if (view === "base") p.base = Math.max(0, newVal);
+          else if (view === "volume") {
+            p.volL = clamp(newVal, 0, 1);
+            p.volR = clamp(newVal, 0, 1);
+          }
+        });
+      }
+    }
+  };
+
+  if (vi === "all") {
+    for (const [vIndexNum, voiceHits] of allHitsByVoice.entries()) {
+      applyToVoice(vIndexNum, voiceHits);
+    }
+  } else {
+    applyToVoice(vi, hits);
+  }
+
+  graph.recomputeScales();
+  engine.setSchedule(sched); restartIfPlaying();
+  closeMassEditDialog();
+};
 
 /* ============================ Export to .gnaural ============================
    Serialize the (possibly edited) in-memory schedule to canonical Gnaural 1.20 XML and download it.

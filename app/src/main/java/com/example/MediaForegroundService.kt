@@ -11,6 +11,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
@@ -24,6 +27,123 @@ class MediaForegroundService : Service() {
     private var position = 0L
     private var duration = 0L
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var heartbeatRunnable: Runnable? = null
+    private var silentAudioTrack: AudioTrack? = null
+    private var isSilentPlaying = false
+    private var silentThread: Thread? = null
+
+    private fun startSilentPlayback() {
+        if (isSilentPlaying) return
+        isSilentPlaying = true
+        silentThread = Thread {
+            val sampleRate = 11025
+            val channelConfig = AudioFormat.CHANNEL_OUT_MONO
+            val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+            val minBufSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+            val bufferSize = if (minBufSize > 0) minBufSize else 2048
+            
+            try {
+                silentAudioTrack = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val audioAttributes = android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                    val audioFormatObj = AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(channelConfig)
+                        .setEncoding(audioFormat)
+                        .build()
+                    AudioTrack.Builder()
+                        .setAudioAttributes(audioAttributes)
+                        .setAudioFormat(audioFormatObj)
+                        .setBufferSizeInBytes(bufferSize)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    AudioTrack(
+                        AudioManager.STREAM_MUSIC,
+                        sampleRate,
+                        channelConfig,
+                        audioFormat,
+                        bufferSize,
+                        AudioTrack.MODE_STREAM
+                    )
+                }
+
+                silentAudioTrack?.play()
+                val silentBuffer = ShortArray(bufferSize / 2)
+                while (isSilentPlaying) {
+                    val track = silentAudioTrack ?: break
+                    val written = track.write(silentBuffer, 0, silentBuffer.size)
+                    if (written <= 0) {
+                        Thread.sleep(100)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        silentThread?.start()
+    }
+
+    private fun stopSilentPlayback() {
+        isSilentPlaying = false
+        try {
+            silentAudioTrack?.stop()
+            silentAudioTrack?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        silentAudioTrack = null
+        silentThread = null
+    }
+
+    private fun startHeartbeat() {
+        if (heartbeatRunnable != null) return
+        
+        heartbeatRunnable = object : Runnable {
+            override fun run() {
+                if (isPlaying) {
+                    mainHandler.post {
+                        try {
+                            val wv = WebViewManager.webView
+                            if (wv != null) {
+                                // Resume JS timers and WebAudio/rendering state in case it was paused
+                                wv.resumeTimers()
+                                wv.onResume()
+                                
+                                // Perform a lightweight JS call to keep the Javascript VM awake and resume suspended AudioContext
+                                wv.evaluateJavascript(
+                                    "if(window.engine && window.engine.ctx) { " +
+                                    "  if(window.engine.ctx.state === 'suspended') { " +
+                                    "    console.log('Heartbeat: Resuming suspended AudioContext'); " +
+                                    "    window.engine.ctx.resume(); " +
+                                    "  } " +
+                                    "}" +
+                                    "if(window.AndroidPlayerControl) { console.log('Android background keep-alive heartbeat ping'); }", null
+                                )
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    // Schedule next heartbeat in 10 seconds
+                    mainHandler.postDelayed(this, 10000L)
+                }
+            }
+        }
+        mainHandler.post(heartbeatRunnable!!)
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatRunnable?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        heartbeatRunnable = null
+    }
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "UPDATE_PLAYBACK_STATE_ACTION") {
@@ -33,8 +153,12 @@ class MediaForegroundService : Service() {
                 
                 if (isPlaying) {
                     if (wakeLock?.isHeld == false) wakeLock?.acquire()
+                    startHeartbeat()
+                    startSilentPlayback()
                 } else {
                     if (wakeLock?.isHeld == true) wakeLock?.release()
+                    stopHeartbeat()
+                    stopSilentPlayback()
                 }
                 
                 position = intent.getLongExtra("position", 0L)
@@ -87,6 +211,8 @@ class MediaForegroundService : Service() {
 
     override fun onDestroy() {
         unregisterReceiver(receiver)
+        stopHeartbeat()
+        stopSilentPlayback()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         mediaSession?.release()
         super.onDestroy()

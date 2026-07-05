@@ -80,6 +80,16 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun onPause() {
+    super.onPause()
+    WebViewManager.webView?.onResume()
+  }
+
+  override fun onStop() {
+    super.onStop()
+    WebViewManager.webView?.onResume()
+  }
+
   private fun startMediaService() {
     val serviceIntent = Intent(this, MediaForegroundService::class.java)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

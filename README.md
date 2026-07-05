@@ -1,6 +1,8 @@
 # Gnauri: Binaural-Beat Schedule Player & Multi-Track Editor
 
 Welcome to **Gnauri**, a highly responsive, offline-first multi-track binaural beat synthesizer, schedule player, and interactive graph editor for Android and Web. Built to be lightweight, precise, and fully compatible with the standard Gnaural XML schema (`.gnaural`), Gnauri empowers you to experience, create, and refine complex brainwave entrainment sessions on the go.
+<img width="921" height="2048" alt="image" src="https://github.com/user-attachments/assets/535b455d-0c37-4137-8899-fd69405e80c0" />
+<img width="921" height="2048" alt="image" src="https://github.com/user-attachments/assets/0da27796-81bb-422d-a938-b0281e942cc9" />
 
 ---
 

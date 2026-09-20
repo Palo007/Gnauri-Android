@@ -587,7 +587,7 @@
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2.3";
+const APP_VERSION = "v2.4";
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):
@@ -1551,6 +1551,75 @@ function load(xml, name){
     $("status").classList.add("err");
   }
 }
+
+async function restoreSession() {
+  if (!window.NativeAudio || typeof window.NativeAudio.getLastSession !== "function") return false;
+  try {
+    const sessionJson = window.NativeAudio.getLastSession();
+    if (!sessionJson) return false;
+    const session = JSON.parse(sessionJson);
+    if (!session || !session.schedule) return false;
+
+    const s = JSON.parse(session.schedule);
+    sched = s;
+    currentFileName = session.filename || "";
+
+    engine.stopReset();
+    engine.running = false;
+    engine.startOffset = 0;
+    engine._played = 0;
+    engine._elapsedAccrued = 0;
+    engine._elapsedSecMirror = 0;
+    engine._ignoreTicksUntilZero = true;
+    updateTransportUI();
+
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoUI();
+
+    if (session.masterVolume !== undefined) {
+      engine.setMasterVolume(session.masterVolume);
+      $("masterVol").value = session.masterVolume * 100;
+      $("volLbl").textContent = Math.round(session.masterVolume * 100) + "%";
+    }
+    if (session.fadeOut30s !== undefined) {
+      engine.fadeOut30s = !!session.fadeOut30s;
+      updateTransportUI();
+    }
+
+    engine.setSchedule(sched, true);
+    graph.setSchedule(sched);
+
+    $("status").textContent="Restored session: "+(currentFileName || sched.title);
+    $("status").classList.remove("err");
+    $("metaBox").style.display="block";
+    $("dropZone").style.display="none";
+    $("playerPanel").style.display="block";
+    $("exportBtn").style.display="inline-flex";
+    $("exportM4aBtn").style.display="inline-flex";
+    $("graphPanel").style.display="block";
+    $("voicePanel").style.display="block";
+    $("mTitle").textContent=sched.title;
+    $("mDur").textContent=fmt(sched.totalTime)+" ("+Math.round(sched.totalTime)+"s)";
+    $("mVoices").textContent=sched.voices.length;
+    if (sched.desc && sched.desc !== "—" && sched.desc.trim()) {
+      $("mDesc").textContent=sched.desc;
+      $("mDescBox").style.display="block";
+    } else {
+      $("mDescBox").style.display="none";
+    }
+    renderVoices(); setupVoiceHeaders();
+    $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched.totalTime, sched.loops) + "</strong>";
+    $("seek").value=0; graph.setPlay(0);
+    graph.setView($("viewSeg").querySelector(".on").dataset.view);
+    syncLoopUI();
+    checkMissingAudio();
+    return true;
+  } catch (e) {
+    console.warn("Failed to restore session", e);
+    return false;
+  }
+}
 // Edit-while-playing: hand the (mutated) schedule to native, which hot-applies at the same
 // elapsed position while playing or just replaces it while stopped (contract §5.6). Native owns
 // the cursor, so there is no local stop/play dance any more.
@@ -1921,8 +1990,11 @@ async function populateScheduleMenu(){
     // Auto-load the default schedule on startup (only if the user hasn't already loaded
     // something — e.g. via 📂 or drag-drop before the menu finished fetching).
     if(!sched){
-      const def=list.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
-      if(def) await loadScheduleFromPath(def);
+      const restored = await restoreSession();
+      if (!restored) {
+        const def=list.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
+        if(def) await loadScheduleFromPath(def);
+      }
     }
   }catch(e){
     console.warn("Could not fetch schedules.json, using hardcoded fallback list", e);
@@ -1952,8 +2024,11 @@ async function populateScheduleMenu(){
     scheduleSelect.appendChild(optSample);
     
     if(!sched){
-      const def=fallbackList.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
-      if(def) await loadScheduleFromPath(def);
+      const restored = await restoreSession();
+      if (!restored) {
+        const def=fallbackList.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
+        if(def) await loadScheduleFromPath(def);
+      }
     }
   }
 }

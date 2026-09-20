@@ -16,3 +16,10 @@
 local.properties
 .env
 debug.keystore
+
+# Agent artifacts
+.artifacts/
+
+# Binaries and releases
+*.7z
+/releases/

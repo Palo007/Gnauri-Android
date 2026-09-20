@@ -64,6 +64,9 @@ class MainActivity : ComponentActivity() {
       startMediaService()
     }
 
+    // Restore previously picked WAV URIs so they are available for the engine.
+    SessionManager.restoreWavs(this)
+
     setContent {
       MyApplicationTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->

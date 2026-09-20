@@ -75,6 +75,30 @@ object WavRegistry {
         }
     }
 
+    /** Returns a copy of the current URI map. */
+    fun getUris(): Map<String, Uri> = synchronized(lock) { HashMap(uris) }
+
+    /** Batch register URIs (for session restoration). */
+    fun registerAll(context: Context, map: Map<String, Uri>) {
+        synchronized(lock) {
+            for ((key, uri) in map) {
+                uris[key] = uri
+                decoded.keys.removeAll { it.substringBeforeLast('@') == key }
+            }
+        }
+        // Best-effort persistable permissions
+        for (uri in map.values) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "takePersistableUriPermission failed for $uri: ${e.message}")
+            }
+        }
+    }
+
     /** Clear both maps (contract §5.5 clear). */
     fun clear() {
         synchronized(lock) {

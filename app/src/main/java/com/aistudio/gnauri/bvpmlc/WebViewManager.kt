@@ -31,6 +31,9 @@ object WebViewManager {
     // Cache the last schedule JSON here so the service can replay it once the engine is ready.
     @Volatile
     var lastScheduleJson: String? = null
+    var lastVolume: Double = 1.0
+    var lastFade: Boolean = false
+    var lastFilename: String? = null
 
     fun getWebView(context: Context): WebView {
         val appCtx = context.applicationContext
@@ -114,13 +117,17 @@ object WebViewManager {
                         // Always remember the latest schedule so it can be replayed if the engine
                         // isn't up yet (first-launch race, see MediaForegroundService.onCreate).
                         lastScheduleJson = json
-                        return MediaForegroundService.engine?.loadSchedule(json) ?: "{\"missing\":[]}"
+                        val res = MediaForegroundService.engine?.loadSchedule(json) ?: "{\"missing\":[]}"
+                        saveSession()
+                        return res
                     }
 
                     @JavascriptInterface
                     fun loadScheduleReset(json: String): String {
                         lastScheduleJson = json
-                        return MediaForegroundService.engine?.loadScheduleReset(json) ?: "{\"missing\":[]}"
+                        val res = MediaForegroundService.engine?.loadScheduleReset(json) ?: "{\"missing\":[]}"
+                        saveSession()
+                        return res
                     }
 
                     @JavascriptInterface
@@ -136,13 +143,21 @@ object WebViewManager {
                     fun seekElapsed(sec: Double) { MediaForegroundService.engine?.seekElapsed(sec) }
 
                     @JavascriptInterface
-                    fun setMasterVolume(v: Double) { MediaForegroundService.engine?.setMasterVolume(v) }
+                    fun setMasterVolume(v: Double) {
+                        lastVolume = v
+                        MediaForegroundService.engine?.setMasterVolume(v)
+                        saveSession()
+                    }
 
                     @JavascriptInterface
                     fun setChannelGains(l: Double, r: Double) { MediaForegroundService.engine?.setChannelGains(l, r) }
 
                     @JavascriptInterface
-                    fun setFadeOut30s(b: Boolean) { MediaForegroundService.engine?.setFadeOut30s(b) }
+                    fun setFadeOut30s(b: Boolean) {
+                        lastFade = b
+                        MediaForegroundService.engine?.setFadeOut30s(b)
+                        saveSession()
+                    }
 
                     @JavascriptInterface
                     fun hasWav(name: String): Boolean =
@@ -155,10 +170,27 @@ object WebViewManager {
                     fun isAvailable(): Boolean = true
 
                     @JavascriptInterface
+                    fun getLastSession(): String? {
+                        val ctx = webView?.context ?: return null
+                        return SessionManager.getLastSession(ctx)
+                    }
+
+                    @JavascriptInterface
                     fun renderM4a(json: String, durationSec: Double, uiVol: Double, chL: Double, chR: Double, fadeOut30s: Boolean, filename: String) {
                         val ctx = webView?.context ?: return
                         com.aistudio.gnauri.bvpmlc.synth.M4aRenderer.render(
                             ctx, json, durationSec, uiVol, chL, chR, fadeOut30s, filename
+                        )
+                    }
+
+                    private fun saveSession() {
+                        val ctx = webView?.context ?: return
+                        SessionManager.saveSession(
+                            ctx,
+                            lastScheduleJson,
+                            lastVolume,
+                            lastFade,
+                            lastFilename
                         )
                     }
                 }, "NativeAudio")

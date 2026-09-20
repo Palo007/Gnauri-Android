@@ -93,7 +93,7 @@ object WebViewManager {
                         val mimeTypes = arrayOf("*/*")
                         try {
                             filePickerLauncher?.launch(mimeTypes)
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             fileChooserCallback?.onReceiveValue(null)
                             fileChooserCallback = null
                             return false
@@ -112,7 +112,7 @@ object WebViewManager {
                 }
                 
                 // Legacy bridge: exportFile ONLY (contract §5.3; playbackStateChanged deleted).
-                addJavascriptInterface(object {
+                addJavascriptInterface(@Suppress("unused") object {
                     @JavascriptInterface
                     fun exportFile(xml: String, filename: String) {
                         exportData = xml
@@ -124,7 +124,7 @@ object WebViewManager {
                 // run on the WebView's JS-bridge thread; they forward to NativeAudioEngine, which is
                 // itself thread-safe (commands are queued onto its render thread). Signatures match
                 // the JS call sites in index.html EXACTLY.
-                addJavascriptInterface(object {
+                addJavascriptInterface(@Suppress("unused") object {
                     @Volatile
                     private var sessionLoaded = false
 

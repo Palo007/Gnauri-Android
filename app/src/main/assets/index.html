@@ -369,11 +369,11 @@
       <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">30s Fade</button>
     </div>
     <div class="row" style="margin-top:10px">
-      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
+      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100" aria-label="Master volume"></div>
     </div>
     <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
       <span class="time" id="timeLbl">0:00 / 0:00</span>
-      <div class="slider"><input id="seek" type="range" min="0" max="1000" value="0"></div>
+      <div class="slider"><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek playback"></div>
     </div>
   </div>
 
@@ -539,37 +539,37 @@
         <label id="edBeatLbl" for="edBeat">Beat (Hz)</label>
         <div class="fldRow">
           <input id="edBeat" type="number" inputmode="decimal" step="0.1" min="0">
-          <input id="edBeatRange" type="range" min="0" max="40" step="0.1">
+          <input id="edBeatRange" type="range" min="0" max="40" step="0.1" aria-label="Beat frequency slider">
         </div>
       </div>
       <div class="fld" id="edBaseFld">
         <label id="edBaseLbl" for="edBase">Carrier (Hz)</label>
         <div class="fldRow">
           <input id="edBase" type="number" inputmode="decimal" step="1" min="0">
-          <input id="edBaseRange" type="range" min="20" max="1000" step="1">
+          <input id="edBaseRange" type="range" min="20" max="1000" step="1" aria-label="Carrier frequency slider">
         </div>
       </div>
       <div class="fld">
         <label>Volume</label>
         <div class="volSingle" id="edVolSingle">
           <div class="fldRow">
-            <input id="edVol" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <input id="edVol" type="number" inputmode="numeric" step="1" min="0" max="100" aria-label="Volume percentage">
             <span class="unit">%</span>
-            <input id="edVolRange" type="range" min="0" max="100" step="1">
+            <input id="edVolRange" type="range" min="0" max="100" step="1" aria-label="Volume slider">
           </div>
         </div>
         <div class="volSplit" id="edVolSplit">
           <div class="fldRow">
             <span class="unit" style="width:14px">L</span>
-            <input id="edVolL" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <input id="edVolL" type="number" inputmode="numeric" step="1" min="0" max="100" aria-label="Left volume percentage">
             <span class="unit">%</span>
-            <input id="edVolLRange" type="range" min="0" max="100" step="1">
+            <input id="edVolLRange" type="range" min="0" max="100" step="1" aria-label="Left volume slider">
           </div>
           <div class="fldRow">
             <span class="unit" style="width:14px">R</span>
-            <input id="edVolR" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <input id="edVolR" type="number" inputmode="numeric" step="1" min="0" max="100" aria-label="Right volume percentage">
             <span class="unit">%</span>
-            <input id="edVolRRange" type="range" min="0" max="100" step="1">
+            <input id="edVolRRange" type="range" min="0" max="100" step="1" aria-label="Right volume slider">
           </div>
         </div>
         <label class="volLinkRow"><input id="edVolLink" type="checkbox" checked> Link L/R (same volume in both ears)</label>
@@ -587,7 +587,7 @@
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2.4.3";
+const APP_VERSION = "v2.4.4";
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):

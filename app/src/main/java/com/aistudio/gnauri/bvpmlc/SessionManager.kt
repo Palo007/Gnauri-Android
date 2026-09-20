@@ -1,7 +1,6 @@
 package com.aistudio.gnauri.bvpmlc
 
 import android.content.Context
-import android.net.Uri
 import androidx.core.net.toUri
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types

@@ -9,16 +9,22 @@ import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.activity.result.ActivityResultLauncher
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
+import com.aistudio.gnauri.bvpmlc.synth.M4aRenderer
 
 @SuppressLint("SetJavaScriptEnabled", "StaticFieldLeak")
 object WebViewManager {
     var webView: WebView? = null
     private var contextWrapper: MutableContextWrapper? = null
-    var fileChooserCallback: android.webkit.ValueCallback<Array<Uri>>? = null
+    var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     var exportData: String? = null
     var exportBinaryData: ByteArray? = null
 
@@ -31,9 +37,16 @@ object WebViewManager {
     // Cache the last schedule JSON here so the service can replay it once the engine is ready.
     @Volatile
     var lastScheduleJson: String? = null
+    @Volatile
     var lastVolume: Double = 1.0
+    @Volatile
     var lastFade: Boolean = false
+    @Volatile
     var lastFilename: String? = null
+    @Volatile
+    var lastChL: Double = 1.0
+    @Volatile
+    var lastChR: Double = 1.0
 
     fun getWebView(context: Context): WebView {
         val appCtx = context.applicationContext
@@ -55,15 +68,15 @@ object WebViewManager {
                     setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
                 }
                 
-                val assetLoader = androidx.webkit.WebViewAssetLoader.Builder()
-                    .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(appCtx))
+                val assetLoader = WebViewAssetLoader.Builder()
+                    .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(appCtx))
                     .build()
                     
-                webViewClient = object : androidx.webkit.WebViewClientCompat() {
+                webViewClient = object : WebViewClientCompat() {
                     override fun shouldInterceptRequest(
                         view: WebView,
-                        request: android.webkit.WebResourceRequest
-                    ): android.webkit.WebResourceResponse? {
+                        request: WebResourceRequest
+                    ): WebResourceResponse? {
                         return assetLoader.shouldInterceptRequest(request.url)
                     }
                 }
@@ -71,7 +84,7 @@ object WebViewManager {
                 webChromeClient = object : WebChromeClient() {
                     override fun onShowFileChooser(
                         webView: WebView?,
-                        filePathCallback: android.webkit.ValueCallback<Array<Uri>>?,
+                        filePathCallback: ValueCallback<Array<Uri>>?,
                         fileChooserParams: FileChooserParams?
                     ): Boolean {
                         fileChooserCallback?.onReceiveValue(null)
@@ -112,8 +125,27 @@ object WebViewManager {
                 // itself thread-safe (commands are queued onto its render thread). Signatures match
                 // the JS call sites in index.html EXACTLY.
                 addJavascriptInterface(object {
+                    @Volatile
+                    private var sessionLoaded = false
+
+                    private fun ensureLoaded() {
+                        if (sessionLoaded) return
+                        val ctx = webView?.context ?: return
+                        val data = SessionManager.getSessionData(ctx)
+                        if (data != null) {
+                            lastScheduleJson = data.schedule
+                            lastVolume = data.masterVolume
+                            lastFade = data.fadeOut30s
+                            lastFilename = data.filename
+                            lastChL = data.chL
+                            lastChR = data.chR
+                        }
+                        sessionLoaded = true
+                    }
+
                     @JavascriptInterface
                     fun loadSchedule(json: String): String {
+                        ensureLoaded()
                         // Always remember the latest schedule so it can be replayed if the engine
                         // isn't up yet (first-launch race, see MediaForegroundService.onCreate).
                         lastScheduleJson = json
@@ -124,6 +156,7 @@ object WebViewManager {
 
                     @JavascriptInterface
                     fun loadScheduleReset(json: String): String {
+                        ensureLoaded()
                         lastScheduleJson = json
                         val res = MediaForegroundService.engine?.loadScheduleReset(json) ?: "{\"missing\":[]}"
                         saveSession()
@@ -144,16 +177,24 @@ object WebViewManager {
 
                     @JavascriptInterface
                     fun setMasterVolume(v: Double) {
+                        ensureLoaded()
                         lastVolume = v
                         MediaForegroundService.engine?.setMasterVolume(v)
                         saveSession()
                     }
 
                     @JavascriptInterface
-                    fun setChannelGains(l: Double, r: Double) { MediaForegroundService.engine?.setChannelGains(l, r) }
+                    fun setChannelGains(l: Double, r: Double) {
+                        ensureLoaded()
+                        lastChL = l
+                        lastChR = r
+                        MediaForegroundService.engine?.setChannelGains(l, r)
+                        saveSession()
+                    }
 
                     @JavascriptInterface
                     fun setFadeOut30s(b: Boolean) {
+                        ensureLoaded()
                         lastFade = b
                         MediaForegroundService.engine?.setFadeOut30s(b)
                         saveSession()
@@ -172,25 +213,36 @@ object WebViewManager {
                     @JavascriptInterface
                     fun getLastSession(): String? {
                         val ctx = webView?.context ?: return null
+                        ensureLoaded()
                         return SessionManager.getLastSession(ctx)
+                    }
+
+                    @JavascriptInterface
+                    fun setFilename(name: String) {
+                        ensureLoaded()
+                        lastFilename = name
+                        saveSession()
                     }
 
                     @JavascriptInterface
                     fun renderM4a(json: String, durationSec: Double, uiVol: Double, chL: Double, chR: Double, fadeOut30s: Boolean, filename: String) {
                         val ctx = webView?.context ?: return
-                        com.aistudio.gnauri.bvpmlc.synth.M4aRenderer.render(
+                        M4aRenderer.render(
                             ctx, json, durationSec, uiVol, chL, chR, fadeOut30s, filename
                         )
                     }
 
                     private fun saveSession() {
                         val ctx = webView?.context ?: return
+                        ensureLoaded()
                         SessionManager.saveSession(
                             ctx,
                             lastScheduleJson,
                             lastVolume,
                             lastFade,
-                            lastFilename
+                            lastFilename,
+                            lastChL,
+                            lastChR
                         )
                     }
                 }, "NativeAudio")

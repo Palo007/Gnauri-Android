@@ -28,6 +28,11 @@ When you download and run the compiled version of Gnauri, you can expect a compr
   * 😴 *Instant Nap* (Deep delta relaxation)
   * ⚙️ *Default Schedule* (A versatile baseline)
 * **Metadata Insight**: Upon loading a file, Gnauri instantly displays the title and author description of the session with clean, zero-margin left-aligned styling.
+* **Auto-Session Restore**: Gnauri automatically remembers your last played schedule and all its settings. When you restart the app, it restores:
+  * The last loaded schedule (including external files).
+  * Individual voice mutes and solo states.
+  * Loop count and 30s Fade toggle.
+  * Master Volume and L/R Channel Balance.
 
 ### 2. Interactive Multi-Track Timeline & Graph Visualizer
 * **Three-Way Parameter Toggle**: Instantly switch the graph visualizer between:

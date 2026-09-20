@@ -95,7 +95,17 @@ This targets the fix in `WebViewManager.kt` / `MediaForegroundService.kt`.
   during the race window was silently dropped, and playback would be silent until a
   schedule reload — e.g. switching schedules and back.)
 
-## 7. Known behavior notes (documented, not bugs)
+## 7. Session Persistence
+
+- Load a schedule, mute a voice, set volume to 50%, set balance to leaning-left 25%.
+- Swipe the app away from Recents (stop the process).
+- Restart the app.
+- **Verification**: The schedule, muted voice, volume level, and balance must all be restored
+  automatically without manual loading.
+- Repeat the test by picking an external `.gnaural` and `.wav` files. After restart, the
+  external schedule must still load and the WAVs must still be audible.
+
+## 8. Known behavior notes (documented, not bugs)
 
 - Pause → resume resets oscillator phase / noise state / WAV playback position back to
   the cursor position (matches the original JS engine's teardown-on-pause behavior); this

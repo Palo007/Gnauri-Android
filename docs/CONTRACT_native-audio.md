@@ -116,6 +116,8 @@ setFadeOut30s(b: Boolean)
 hasWav(name: String): Boolean        // for checkMissingAudio (index.html:2177-2185)
 clearWavs()                          // replaces engine.clearAudioBuffers() in ingestFiles (2155)
 isAvailable(): Boolean               // true
+getLastSession(): String?            // returns combined JSON of last schedule, volume, balance, etc.
+setFilename(name: String)            // record the filename for session persistence
 ```
 ### 5.2 Kotlin → JS (evaluateJavascript, main handler, ~4 Hz while playing + on every state change)
 ```
@@ -141,7 +143,23 @@ and pushes into `SynthEngine.setAudioBuffer`.
 `loadSchedule` while playing ⇒ capture `elapsedSeconds`, STOP_FADE the old state, resume the new
 schedule at the same elapsed position (clamped). While stopped ⇒ just replace, keep cursor clamped.
 
-## 6. JS-side changes (WP2) — surgical rules
+## 6. Session Persistence
+
+The Android app automatically persists the last played session to `SharedPreferences` to allow seamless restoration on startup.
+
+1. **Saved Data**:
+   - `last_schedule_json`: The full schedule object (mutes, loops, points).
+   - `wav_uris`: Map of `normName` to content URIs for external audio files.
+   - `master_volume`: Master output gain (0.0–1.5).
+   - `fade_out_30s`: The 30s fade toggle state.
+   - `ch_l` / `ch_r`: Per-channel output trims (stereo balance).
+   - `current_filename`: Name of the loaded file.
+2. **Implementation**:
+   - `SessionManager`: Handles `SharedPreferences` I/O with synchronous `commit()` for reliability.
+   - `WebViewManager`: Bridge ensures it populates its internal `@Volatile` state from storage via `ensureLoaded()` before allowing any UI-triggered saves.
+   - `MainActivity`: Restores WAV URIs on startup using `SessionManager.restoreWavs(this)`.
+
+## 7. JS-side changes (WP2) — surgical rules
 
 - **Keep** `parseGnaural`, `buildSegments`, `sampleVoice` in JS — the UI live-readout
   (index.html:2008-2015) and Graph still use them.

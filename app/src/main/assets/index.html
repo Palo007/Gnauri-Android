@@ -587,7 +587,7 @@
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2.4";
+const APP_VERSION = "v2.4.3";
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):
@@ -763,8 +763,6 @@ class GnauriEngine{
     this._chL=1; this._chR=1;
     // legacy field some UI paths poke; unused by the native engine but kept so writes don't throw
     this._elapsedAccrued=0;
-    // apply any deferred settings once the bridge becomes available
-    this._pushSettings();
   }
   // Is the native bridge present? (contract §5.1 isAvailable)
   _hasNative(){ return !!(window.NativeAudio && typeof window.NativeAudio.play === "function"); }
@@ -1504,6 +1502,9 @@ document.addEventListener('keydown', (e) => {
 
 function load(xml, name){
   currentFileName = name || "";
+  if (window.NativeAudio && typeof window.NativeAudio.setFilename === "function") {
+    window.NativeAudio.setFilename(currentFileName);
+  }
   try{
     // Stop anything currently playing before swapping schedules, so the previous
     // schedule doesn't keep sounding under the new one. The new schedule lands paused
@@ -1584,7 +1585,16 @@ async function restoreSession() {
     }
     if (session.fadeOut30s !== undefined) {
       engine.fadeOut30s = !!session.fadeOut30s;
+      $("fadeBtn").classList.toggle("primary", engine.fadeOut30s);
       updateTransportUI();
+    }
+    if (session.chL !== undefined && session.chR !== undefined) {
+      engine.setChannelGains(session.chL, session.chR);
+      // Sync the balance UI
+      let bal = 0;
+      if (session.chL < 1) bal = Math.round((1 - session.chL) * 100);
+      else if (session.chR < 1) bal = Math.round((session.chR - 1) * 100);
+      applyBalance(bal);
     }
 
     engine.setSchedule(sched, true);

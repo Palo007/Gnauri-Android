@@ -1,0 +1,16 @@
+[
+  "schedules/baa_wind_and_waves.gnaural",
+  "schedules/caa_spring_rain.gnaural",
+  "schedules/daa_energize.gnaural",
+  "schedules/eaa_power_nap.gnaural",
+  "schedules/faa_problem_resolver.gnaural",
+  "schedules/gaa_dream.gnaural",
+  "schedules/haa_wakeup.gnaural",
+  "schedules/iaa_tibetan_bowls.gnaural",
+  "schedules/jaa_travel_aid.gnaural",
+  "schedules/kaa_study_time.gnaural",
+  "schedules/laa_rain_shower.gnaural",
+  "schedules/maa_babbling_brook.gnaural",
+  "schedules/naa_instant_nap.gnaural",
+  "schedules/zaa_default_schedule.gnaural"
+]

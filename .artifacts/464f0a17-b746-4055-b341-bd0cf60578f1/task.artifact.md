@@ -1,0 +1,1 @@
+- [ ] Task 1: Implement Long-Press Logic in index.html

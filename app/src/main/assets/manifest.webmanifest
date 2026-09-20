@@ -1,0 +1,14 @@
+{
+  "name": "Gnauri — Binaural Beat Player",
+  "short_name": "Gnauri",
+  "description": "Load and play Gnaural (.gnaural) binaural-beat schedules entirely offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1320",
+  "theme_color": "#0e1320",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

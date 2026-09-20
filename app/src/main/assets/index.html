@@ -1,0 +1,2696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0e1320">
+<title>Gnauri — Binaural Beat Player</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root{
+    --bg:#0e1320; --panel:#161d2e; --panel2:#1d273d; --line:#2a3650;
+    --txt:#e6ecff; --dim:#8a97b8; --accent:#5ad1c4; --beat:#5ad1c4;
+    --pitch:#ffb454; --vol:#a78bfa; --danger:#ff6b81; --ok:#5ad17a;
+    --grid:#212c44;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--txt);
+    font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex; flex-direction:column; min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; padding:12px 16px;
+    background:linear-gradient(180deg,#18223a,#121828); border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  .sub{color:var(--dim);font-size:12px}
+  .wrap{flex:1;display:flex;flex-direction:column;gap:14px;padding:16px;max-width:1100px;width:100%;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .top-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    width: 100%;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+  }
+  .top-row button, .top-row .filebtn, .top-row select.schedsel {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    text-align: center;
+    text-align-last: center;
+    white-space: nowrap;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 8px 2px !important;
+    height: 36px;
+    margin: 0;
+  }
+  .top-row select.schedsel {
+    width: auto !important;
+    -webkit-padding-start: 4px !important;
+    -webkit-padding-end: 12px !important;
+    padding-left: 4px !important;
+    padding-right: 12px !important;
+  }
+  button,.filebtn{
+    background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:9px;padding:8px 8px;font-size:13px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:4px;transition:.12s;
+  }
+  button:hover,.filebtn:hover{border-color:var(--accent);color:#fff}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--accent);color:#06231f;border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--danger)}
+  input[type=file]{display:none}
+  .schedsel{
+    background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:9px;padding:8px 18px 8px 6px;font-size:13px;cursor:pointer;
+    font-family:inherit;width:86px;
+    -webkit-padding-start:6px;
+    -webkit-padding-end:18px;
+  }
+  .schedsel option{
+    background:#161d2e;
+    color:#e6ecff;
+  }
+  .schedsel:hover{border-color:var(--accent);color:#fff}
+  .schedsel:focus{outline:none;border-color:var(--accent)}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+  .meta b{color:var(--dim);font-weight:500}
+  canvas{width:100%;display:block;border-radius:8px;background:var(--panel2);touch-action:none}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:8px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .transport{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+  .transport > *{flex:1;min-width:0}
+  .transport button{justify-content:center;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:38px;box-sizing:border-box}
+  .transport .balWrap button{width:100%}
+  .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--dim);min-width:120px}
+  .slider{display:flex;align-items:center;gap:8px;flex:1;min-width:180px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:0;border-radius:0;padding:8px 10px;font-size:12px;background:var(--panel2);display:inline-flex;align-items:center;justify-content:center;text-align:center}
+  .seg button.on{background:var(--accent);color:#06231f;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--grid)}
+  th{color:var(--dim);font-weight:500}
+  #voiceTbl{table-layout:auto;width:100%}
+  #voiceTbl th, #voiceTbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+  #voiceTbl .col-idx{width:1%;text-align:center}
+  #voiceTbl .col-voice{white-space:normal;word-break:break-word;word-wrap:break-word}
+  #voiceTbl .col-type{white-space:nowrap;width:1%}
+  #voiceTbl .col-pts{width:1%;text-align:center}
+  #voiceTbl .col-view{width:1%;text-align:center}
+  #voiceTbl .col-mute{width:1%;text-align:center}
+  #voiceTbl .col-solo{width:1%;text-align:center}
+  .pill{font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .muted-row{opacity:.45}
+  .toggle{cursor:pointer;user-select:none}
+  .hint{color:var(--dim);font-size:12px}
+  .err{color:var(--danger)}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--dim)}
+  .drop.over{border-color:var(--accent);color:var(--accent);background:rgba(90,209,196,.06)}
+  footer{padding:10px 16px;color:var(--dim);font-size:11px;border-top:1px solid var(--line);text-align:center}
+  .nowrap{white-space:nowrap}
+
+  /* ---- Meta row: details on the left, Repeat card pinned to the right ---- */
+  .metaRow{display:flex;align-items:stretch;gap:16px}
+  .metaRow .meta{flex:1;min-width:0;align-self:center}
+  .repeatCard{
+    flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:9px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:11px 16px 12px;min-width:176px;justify-content:center;
+  }
+  .repeatCard .rcTop{
+    font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.4px;text-transform:uppercase;
+    width:100%;text-align:center;padding-bottom:8px;border-bottom:1px solid var(--line);
+  }
+  .stepper{
+    display:inline-flex;align-items:stretch;
+    border:1px solid var(--line);border-radius:11px;overflow:hidden;
+    background:var(--panel);height:52px;
+  }
+  .stepper button{
+    width:56px;height:52px;font-size:30px;font-weight:700;line-height:1;padding:0;
+    justify-content:center;border:0;border-radius:0;
+    background:rgba(90,209,196,.12);color:var(--accent);transition:.12s;
+  }
+  .stepper button:hover{background:rgba(90,209,196,.24);color:#fff;border:0}
+  .stepper button:active{background:var(--accent);color:#06231f}
+  .stepper input{
+    width:58px;height:52px;text-align:center;font-size:18px;font-weight:700;
+    background:transparent;color:var(--txt);border:0;border-left:1px solid var(--line);
+    border-right:1px solid var(--line);font-variant-numeric:tabular-nums;
+    -moz-appearance:textfield;padding:0;
+  }
+  .stepper input:focus{outline:none;background:rgba(90,209,196,.08)}
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .stepper input.inf{color:var(--accent)}
+  .loophint{color:var(--dim);font-size:11px;text-align:center;line-height:1.3;min-height:30px;display:flex;flex-direction:column;justify-content:center}
+  .loophint .lhBig{color:var(--txt);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+  .loophint .lhCap{color:var(--dim);font-size:11px}
+
+  /* ---- Graph panel header: title left, view toggle right ---- */
+  .graphHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;position:relative;z-index:10}
+  .graphTitle{font-size:14px;font-weight:600;letter-spacing:.2px}
+  .seg .segLbl{display:inline-flex;align-items:center;padding:0 10px;color:var(--dim);font-size:12px;background:var(--panel2);border-right:1px solid var(--line)}
+
+  /* ---- Graph tooltip (HTML overlay, mobile-aware) ---- */
+  .graphWrap{position:relative;z-index:20}
+  #graphTip{
+    position:absolute;pointer-events:none;z-index:5;
+    background:rgba(14,19,32,.96);border:1px solid var(--line);
+    border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;
+    box-shadow:0 6px 18px rgba(0,0,0,.45);
+    transform:translate(-50%,-100%);white-space:nowrap;
+    opacity:0;visibility:hidden;transition:opacity .08s, visibility .08s;max-width:80vw;
+  }
+  #graphTip.show{opacity:1;visibility:visible}
+  #graphTip .tt{color:var(--accent);font-weight:600;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  #graphTip .vrow{display:flex;align-items:center;gap:6px}
+  #graphTip .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  #graphTip .vname{color:var(--dim);max-width:120px;overflow:hidden;text-overflow:ellipsis}
+  #graphTip .vval{margin-left:auto;font-variant-numeric:tabular-nums}
+  #graphTip.locked{border-color:var(--accent)}
+  #graphTip .lockbadge{color:var(--accent);font-size:10px;margin-top:4px}
+  #graphTip .editbtn{
+    pointer-events:auto;margin-top:6px;width:100%;justify-content:center;
+    background:var(--accent);color:#06231f;border-color:var(--accent);
+    font-weight:600;padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer;
+  }
+  #graphTip .editbtn:hover{filter:brightness(1.08)}
+
+  /* ---- Edit-point modal ---- */
+  .modalBack{
+    position:fixed;inset:0;z-index:50;display:none;
+    background:rgba(6,10,20,.62);
+    align-items:center;justify-content:center;padding:16px;
+  }
+  .modalBack.show{display:flex}
+  .modal{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    width:100%;max-width:380px;max-height:90vh;overflow:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.55);
+  }
+  .modalHead{
+    display:flex;align-items:center;gap:9px;padding:14px 16px;
+    border-bottom:1px solid var(--line);
+  }
+  .modalHead .vsw{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+  .modalHead .mTitle{font-weight:600;font-size:14px}
+  .modalHead .mWhen{color:var(--dim);font-size:12px;margin-left:auto;font-variant-numeric:tabular-nums}
+  .modalBody{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+  .fld{display:flex;flex-direction:column;gap:6px}
+  .fld>label{color:var(--dim);font-size:12px;font-weight:500}
+  .fld .fldRow{display:flex;align-items:center;gap:10px}
+  .fld input[type=number]{
+    width:96px;background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;font-size:15px;font-variant-numeric:tabular-nums;
+    -moz-appearance:textfield;
+  }
+  .fld input[type=number]:focus{outline:none;border-color:var(--accent)}
+  .fld input[type=number]::-webkit-outer-spin-button,.fld input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .fld .unit{color:var(--dim);font-size:12px}
+  .fld input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+  .volLinkRow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer;user-select:none}
+  .volLinkRow input{accent-color:var(--accent)}
+  .volSplit{display:none;flex-direction:column;gap:10px}
+  .volSplit.show{display:flex}
+  .volSingle.hide{display:none}
+  .modalFoot{
+    display:flex;gap:10px;justify-content:flex-end;padding:12px 16px;
+    border-top:1px solid var(--line);flex-wrap:wrap;
+  }
+  .modalFoot .grow{margin-right:auto;color:var(--dim);font-size:11px;align-self:center;max-width:55%}
+
+  /* ---- L/R balance popover ---- */
+  .balWrap{position:relative;display:inline-flex}
+  .balMenu{
+    position:absolute;z-index:40;left:0;bottom:calc(100% + 8px);
+    width:248px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 14px 40px rgba(0,0,0,.5);padding:12px;display:none;
+  }
+  .balMenu.show{display:block}
+  .balHead{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.3px;text-transform:uppercase;margin-bottom:10px}
+  .balFld{display:flex;align-items:center;gap:9px;margin:8px 0}
+  .balFld .balTag{width:14px;text-align:center;color:var(--dim);font-weight:600}
+  .balFld input[type=range]{flex:1;accent-color:var(--accent)}
+  .balFld .balVal{width:42px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+  .balFoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .balFoot #balReset{padding:6px 12px;font-size:13px}
+  @media(max-width:560px){
+    /* on a phone, anchor the popover to the screen so it never clips off the button row */
+    .balMenu{position:fixed;left:10px;right:10px;bottom:auto;top:50%;transform:translateY(-50%);width:auto;max-width:340px;margin:0 auto}
+  }
+  @media(max-width:560px){
+    /* tighten everything so the loaded player fits one screen */
+    .wrap{padding:10px;gap:8px}
+    .panel{padding:10px;border-radius:10px}
+    header{padding:9px 14px}
+    .meta{gap:3px 12px}
+    .time{min-width:0;width:100%}
+    .legend{display:none}            /* hints are inline elsewhere; reclaim the space */
+    #metaBox{margin-top:3px!important}
+    /* keep details + Repeat side by side, just tighter */
+    .metaRow{gap:10px}
+    .repeatCard{padding:9px 11px;min-width:184px;gap:6px}
+    .transport{gap:6px}
+    .transport button{padding:0 4px;font-size:13px;height:36px}
+    /* graph header: title + toggle stay on one line, toggle fills remaining space */
+    .graphHead{gap:4px;margin-bottom:8px}
+    .seg{flex:1;justify-content:stretch}
+    .seg button{flex:1}
+    #historySeg{flex:none}
+    #historySeg button{flex:none}
+    th,td{padding:4px 3px;font-size:11px}
+  }
+  @media(max-width:380px){
+    /* very narrow: stack so nothing is cramped */
+    .metaRow{flex-direction:column}
+    .repeatCard{flex-direction:row;align-self:stretch;justify-content:space-between;min-width:0}
+  }
+  .custom-dropdown-opt {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--txt);
+    transition: background 0.12s;
+    text-align: left;
+    width: 100%;
+    background: none;
+    border: none;
+    display: block;
+    box-sizing: border-box;
+    font-family: inherit;
+    border-bottom: 1px solid var(--grid);
+  }
+  .custom-dropdown-opt:last-child {
+    border-bottom: none;
+  }
+  .custom-dropdown-opt:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  .custom-dropdown-opt.selected {
+    background: var(--accent);
+    color: #06231f;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gnau<span>ri</span></h1>
+  <span class="sub">binaural-beat schedule player</span>
+</header>
+
+<div class="wrap">
+
+  <div class="panel">
+    <div class="top-row">
+      <label class="filebtn">📂 Load<input id="file" type="file" multiple accept=".gnaural,.xml,.wav,audio/wav,audio/x-wav,text/xml,application/xml"></label>
+      <select id="scheduleSelect" class="schedsel" aria-label="Load a bundled schedule">
+        <option value="">Presets</option>
+      </select>
+      <button id="exportBtn" title="Download the current (edited) schedule as a .gnaural file" style="display:none">💾 Save</button>
+      <button id="exportM4aBtn" title="Render and download the current schedule as an .m4a file" style="display:none">🎵 m4a</button>
+    </div>
+    <div id="loadedSection" style="margin-top:4px; display:flex; flex-direction:column; gap:0px; text-align:left; width:100%; padding:0;">
+      <span class="hint" id="status" style="display:block; text-align:left; margin:0; padding:0; width:100%;">No schedule loaded.</span>
+      <div id="mDescBox" class="hint" style="display:none; margin-top:2px; line-height:1.35; text-align:left; width:100%; padding:0;"><b style="color:var(--txt)">Description:</b> <span id="mDesc" style="white-space:pre-wrap;">—</span></div>
+    </div>
+    <div id="dropZone" class="drop" style="margin-top:8px">Drag a <b>.gnaural</b> file (and its <b>.wav</b> files) here, or use the buttons above.<br><span class="hint">Schedules with audio-file voices need their <b>.wav</b> files selected/dropped alongside the <b>.gnaural</b>.</span></div>
+    <div id="metaBox" style="display:none;margin-top:3px">
+      <div class="metaRow">
+        <div class="meta">
+          <b>Title</b><span id="mTitle">—</span>
+          <b>Duration</b><span id="mDur">—</span>
+          <b>Voices</b><span id="mVoices">—</span>
+        </div>
+        <div class="repeatCard" title="How many times to play — 0 = ∞ (loops until you stop)">
+          <div class="rcTop">🔁 Repeat</div>
+          <span class="stepper">
+            <button id="loopMinus" aria-label="Fewer repeats">−</button>
+            <input id="loopInput" type="number" inputmode="numeric" min="0" step="1" value="0" aria-label="Repeat count (0 = infinite)">
+            <button id="loopPlus" aria-label="More repeats">+</button>
+          </span>
+          <div class="loophint" id="loopHint"><span class="lhBig">plays forever</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="playerPanel" style="display:none">
+    <div class="transport">
+      <button id="playBtn" class="primary">▶ Play</button>
+      <button id="stopBtn">⏹ Stop</button>
+      <div class="balWrap">
+        <button id="balBtn" title="Adjust left/right channel balance for your headphones — remembered on this device" aria-haspopup="true" aria-expanded="false">🎚 Balance</button>
+        <div id="balMenu" class="balMenu" role="dialog" aria-label="Left/right channel balance">
+          <div class="balHead">L/R Channel Balance</div>
+          <div class="balFld">
+            <span class="balTag">L</span>
+            <input id="balSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Left/right balance">
+            <span class="balTag">R</span>
+          </div>
+          <div class="balFoot">
+            <span class="hint" id="balNote">Centered</span>
+            <button id="balReset">↺ Reset</button>
+          </div>
+        </div>
+      </div>
+      <button id="fadeBtn" class="primary" title="Perform a 30s fade out when schedule ends (if not set to infinite loop)">30s Fade</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="slider"><span class="hint nowrap">🔊</span><span id="volLbl" class="hint" style="min-width:36px;text-align:right;font-variant-numeric:tabular-nums;cursor:pointer" title="Reset to 100%">100%</span><input id="masterVol" type="range" min="0" max="150" value="100"></div>
+    </div>
+    <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+      <span class="time" id="timeLbl">0:00 / 0:00</span>
+      <div class="slider"><input id="seek" type="range" min="0" max="1000" value="0"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="voicePanel" style="display:none">
+    <table id="voiceTbl">
+      <thead><tr>
+        <th class="col-idx">#</th>
+        <th class="col-voice">Voice</th>
+        <th class="col-type">Type</th>
+        <th class="col-pts">Pts</th>
+        <th class="toggle col-view" id="viewAll" title="Show/hide all on graph">View</th>
+        <th class="toggle col-mute" id="muteAll" title="Mute/unmute all">Mute</th>
+        <th class="toggle col-solo" id="soloHdr">Solo</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="graphPanel" style="display:none">
+    <div class="graphHead" style="flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 4px; width: 100%;">
+      <!-- Left side: Scale and Undo/Redo aligned together with no empty space -->
+      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+        <button id="scaleTimeBtn" title="Scale the schedule duration" style="padding: 6px 8px; font-size: 11px; font-weight: 500; height: 30px; display: inline-flex; align-items: center; gap: 4px; margin: 0;">⏳ Scale</button>
+        <div class="seg" id="historySeg" title="Undo / Redo edits" style="height: 30px; display: inline-flex; align-items: center;">
+          <button id="undoBtn" disabled title="Undo (Ctrl+Z)" style="border-right: 1px solid var(--line); font-size: 12px; font-weight: bold; padding: 0 10px; height: 100%;">↶</button>
+          <button id="redoBtn" disabled title="Redo (Ctrl+Y)" style="font-size: 12px; font-weight: bold; padding: 0 10px; height: 100%;">↷</button>
+        </div>
+      </div>
+      <!-- Right side: Beat / Base / Vol screen toggle -->
+      <div class="seg" id="viewSeg" title="Choose which parameter the graph shows" style="height: 30px; display: inline-flex; align-items: center;">
+        <button data-view="beat" class="on" style="border-right: 1px solid var(--line); padding: 0 8px; font-size: 11px; height: 100%;">Beat</button>
+        <button data-view="base" style="border-right: 1px solid var(--line); padding: 0 8px; font-size: 11px; height: 100%;">Base</button>
+        <button data-view="volume" style="padding: 0 8px; font-size: 11px; height: 100%;">Vol</button>
+      </div>
+    </div>
+    <div class="graphWrap">
+      <canvas id="graph" width="1040" height="340"></canvas>
+      <div id="graphTip"></div>
+    </div>
+    <div class="legend">
+      <span>Each voice = its own colour (see list above)</span>
+      <span>In Volume view: <b>solid</b>=Left, <b>dashed</b>=Right</span>
+      <span class="hint">Hover or drag for values. <b>Tap</b> to pin a point; tap empty space to clear.</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scale Schedule Time Modal -->
+<div class="modalBack" id="scaleTimeDlg" role="dialog" aria-modal="true" aria-labelledby="scaleTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="mTitle" id="scaleTitle">⏳ Scale Schedule Time</span>
+    </div>
+    <div class="modalBody">
+      <p id="scaleTimeCurrent" class="sub" style="margin-bottom:12px;"></p>
+      
+      <div class="fld">
+        <label for="scaleTimeInput">New Total Time (seconds) or Multiplier (e.g. *1.5)</label>
+        <div class="fldRow">
+          <input type="text" id="scaleTimeInput" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button id="scaleTimeCancel">Cancel</button>
+      <button id="scaleTimeApply" class="primary">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Render M4A Dialog -->
+<div class="modalBack" id="renderM4aDlg" role="dialog" aria-modal="true" aria-labelledby="renderM4aTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="mTitle" id="renderM4aTitle">🎵 Render M4A Audio</span>
+    </div>
+    <div class="modalBody">
+      <p id="renderM4aCurrent" class="sub" style="margin-bottom:12px;"></p>
+      
+      <div class="fld">
+        <label for="renderM4aInput">Target Duration (minutes):</label>
+        <div class="fldRow">
+          <input type="number" step="any" id="renderM4aInput" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+        </div>
+        <span class="hint" style="margin-top: 4px; display: block;">Default (1 loop): <span id="renderM4aLoopHint"></span> minutes</span>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button id="renderM4aCancel">Cancel</button>
+      <button id="renderM4aApply" class="primary">Render</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mass Adjust Points Modal -->
+<div class="modalBack" id="massEditDlg" role="dialog" aria-modal="true" aria-labelledby="massTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="mTitle" id="massTitle">🪄 Mass Adjust Points</span>
+    </div>
+    <div class="modalBody">
+      <p id="massEditStats" class="sub" style="margin-bottom:12px;"></p>
+      
+      <div class="fld" style="margin-bottom:14px; position:relative;">
+        <label>Adjust Voice</label>
+        <div class="custom-select-container" id="massEditVoiceSelectContainer" style="position: relative; width: 100%;">
+          <button type="button" id="massEditVoiceSelectBtn" style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--panel2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; text-align: left; font-family: inherit;">
+            <span id="massEditVoiceSelectLabel">Select Voice...</span>
+            <span style="font-size: 10px; color: var(--dim);">▼</span>
+          </button>
+          <div id="massEditVoiceSelectDropdown" style="display: none; position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.55);">
+            <!-- Options will be dynamically populated here -->
+          </div>
+        </div>
+      </div>
+
+      <div class="fld" style="margin-bottom:10px;">
+        <label>Adjustment Mode</label>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+          <button id="btnModeShift" class="on" style="flex:1">Shift</button>
+          <button id="btnModeRamp" style="flex:1">Ramp</button>
+        </div>
+      </div>
+      
+      <div class="fld" id="massEditShiftPane">
+        <label for="massEditDelta">Delta (can be negative)</label>
+        <div class="fldRow">
+          <input type="number" id="massEditDelta" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+        </div>
+      </div>
+      
+      <div id="massEditRampPane" style="display:none; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:10px;">
+          <div class="fld" style="flex:1">
+            <label for="massEditStart">Start Value</label>
+            <input type="number" id="massEditStart" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+          </div>
+          <div class="fld" style="flex:1">
+            <label for="massEditEnd">End Value</label>
+            <input type="number" id="massEditEnd" step="0.1" value="0" style="width:100%; padding:8px; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px;" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button id="massEditCancel">Cancel</button>
+      <button id="massEditApply" class="primary">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit-point modal: edit beat/pulse, carrier (base), and volume of one saved datapoint -->
+<div class="modalBack" id="editBack" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+  <div class="modal">
+    <div class="modalHead">
+      <span class="vsw" id="edSwatch"></span>
+      <span class="mTitle" id="edTitle">Edit point</span>
+      <span class="mWhen" id="edWhen">—</span>
+    </div>
+    <div class="modalBody">
+      <div class="fld" id="edBeatFld">
+        <label id="edBeatLbl" for="edBeat">Beat (Hz)</label>
+        <div class="fldRow">
+          <input id="edBeat" type="number" inputmode="decimal" step="0.1" min="0">
+          <input id="edBeatRange" type="range" min="0" max="40" step="0.1">
+        </div>
+      </div>
+      <div class="fld" id="edBaseFld">
+        <label id="edBaseLbl" for="edBase">Carrier (Hz)</label>
+        <div class="fldRow">
+          <input id="edBase" type="number" inputmode="decimal" step="1" min="0">
+          <input id="edBaseRange" type="range" min="20" max="1000" step="1">
+        </div>
+      </div>
+      <div class="fld">
+        <label>Volume</label>
+        <div class="volSingle" id="edVolSingle">
+          <div class="fldRow">
+            <input id="edVol" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <span class="unit">%</span>
+            <input id="edVolRange" type="range" min="0" max="100" step="1">
+          </div>
+        </div>
+        <div class="volSplit" id="edVolSplit">
+          <div class="fldRow">
+            <span class="unit" style="width:14px">L</span>
+            <input id="edVolL" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <span class="unit">%</span>
+            <input id="edVolLRange" type="range" min="0" max="100" step="1">
+          </div>
+          <div class="fldRow">
+            <span class="unit" style="width:14px">R</span>
+            <input id="edVolR" type="number" inputmode="numeric" step="1" min="0" max="100">
+            <span class="unit">%</span>
+            <input id="edVolRRange" type="range" min="0" max="100" step="1">
+          </div>
+        </div>
+        <label class="volLinkRow"><input id="edVolLink" type="checkbox" checked> Link L/R (same volume in both ears)</label>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <span class="grow" id="edNote"></span>
+      <button id="edCancel">Cancel</button>
+      <button id="edApply" class="primary">Apply</button>
+    </div>
+  </div>
+</div>
+
+<footer>Gnauri <span id="ver">v2.2</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
+
+<script>
+/* Build version — stamped on every substantive edit (see CLAUDE.md). */
+const APP_VERSION = "v2.3";
+
+/* ============================ Gnaural file parser ============================
+   .gnaural files are XML. Schema (Gnaural 1.x / Java):
+     <gnauralfile version="1.20"> or <gnaural ...>
+       <metadata><title/><author/><description/> ... </metadata>   (varies by version)
+       <schedule totaltime="SECONDS" ...> OR top-level <product_title> etc.
+       <voices>
+         <voice id=".." type="0|1|.." description=".." ...>
+            <voice_state ...>  (mute/visible flags, varies)
+            <datapoints>
+              <datapoint duration=".." beatfreq=".." basefreq=".." volume_left=".." volume_right=".." state=".."/>
+              ...
+   Fields differ across versions, so we read defensively by trying multiple
+   attribute names and falling back to element text.
+============================================================================= */
+function num(v, d){ const n = parseFloat(v); return isFinite(n) ? n : d; }
+function attr(el, names){
+  for(const n of names){ const v = el.getAttribute(n); if(v!==null && v!=='') return v; }
+  return null;
+}
+function childText(el, names){
+  for(const n of names){
+    const c = el.getElementsByTagName(n)[0];
+    if(c && c.textContent.trim()!=='') return c.textContent.trim();
+  }
+  return null;
+}
+
+// directly-nested child by tag name (avoids grabbing descendants)
+function directChild(el, name){
+  for(const c of el.children) if(c.tagName===name) return c;
+  return null;
+}
+function parseGnaural(xmlString){
+  const doc = new DOMParser().parseFromString(xmlString, "application/xml");
+  if(doc.getElementsByTagName("parsererror").length)
+    throw new Error("File is not valid XML.");
+
+  const root = doc.documentElement;  // <schedule> (Gnaural1/2) or <gnauralfile> (variants)
+  // metadata (Gnaural uses element text under <schedule>)
+  const title = childText(root,["title","product_title","Title"]) ||
+                attr(root,["title"]) || "Untitled schedule";
+  const author = childText(root,["author","product_author","Author"]) ||
+                 attr(root,["author"]) || "—";
+  const desc  = childText(root,["schedule_description","product_description","description","Description"]) || "—";
+
+  // global params
+  const ovL = num(childText(root,["overallvolume_left"]), 1);
+  const ovR = num(childText(root,["overallvolume_right"]), 1);
+  // loops: 0 (or absent) => infinite; N>0 => play N times total
+  const loops = Math.max(0, num(childText(root,["loops"]), 0));
+  const stereoswap = num(childText(root,["stereoswap"]), 0) === 1;
+
+  // voices
+  let voiceEls = [...root.children].filter(c => c.tagName === "voice");
+  if(!voiceEls.length){
+    const voicesContainer = directChild(root, "voices") || root.getElementsByTagName("voices")[0];
+    if(voicesContainer){
+      voiceEls = [...voicesContainer.children].filter(c => c.tagName === "voice");
+    }
+  }
+  if(!voiceEls.length){
+    voiceEls = [...root.getElementsByTagName("voice")];
+  }
+  if(!voiceEls.length) throw new Error("No <voice> entries found.");
+
+  const voices = voiceEls.map((v, vi) => {
+    // type: 0 = binaural tone, 1 = pink noise, 2 = audio file,
+    //       3 = isochronic pulse, 4 = alt isochronic (gapped). Gnaural also defines
+    //       5 = white noise, 6 = brown noise (Gnaural "nature sounds"). Gnauri synthesises
+//       these as stereo noise fields with decorrelated L/R channels.
+    const rawType = num(childText(v,["type"]) ?? attr(v,["type"]), 0);
+    const vdesc = childText(v,["description"]) || attr(v,["description","name"]) || ("Voice "+vi);
+    const muted   = num(childText(v,["voice_mute"]) ?? attr(v,["mute"]), 0) === 1;
+    // graph visibility: shown by default (honoring the file's hide flag). Muting a voice
+    // also hides it from the graph and unmuting re-shows it (see the mute/solo handlers),
+    // so the timeline only ever plots voices you can actually hear.
+    const visible = num(childText(v,["voice_hide"]) ?? "0", 0) === 0 &&
+                    num(attr(v,["view","visible"]) ?? "1", 1) !== 0 &&
+                    !muted;
+    const mono    = num(childText(v,["voice_mono"]) ?? attr(v,["mono"]), 0) === 1;
+
+    const entriesParent = directChild(v,"entries") || directChild(v,"datapoints") || v;
+    const dpEls = [...entriesParent.children].filter(c => c.tagName==="entry" || c.tagName==="datapoint");
+    const points = dpEls.map(dp => {
+      const duration = num(attr(dp,["duration"]), 0);
+      const beat     = num(attr(dp,["beatfreq","beat","beatFrequency"]), 0);
+      const base     = num(attr(dp,["basefreq","base","baseFrequency","pitch","carrier"]), 0);
+      let volL = attr(dp,["volume_left","volumeleft","volleft"]);
+      let volR = attr(dp,["volume_right","volumeright","volright"]);
+      let vol  = attr(dp,["volume","vol"]);
+      let vl, vr;
+      if(volL!==null || volR!==null){ vl = num(volL, num(volR,1)); vr = num(volR, num(volL,1)); }
+      else { const single = num(vol, 1); vl = single; vr = single; }
+      const norm = x => x > 1.0001 ? x/100 : x;   // tolerate 0..100 inputs
+      const state = num(attr(dp,["state"]), 1);    // 0 = "off" anchor point
+      return { duration, beat, base, volL:norm(vl), volR:norm(vr), state };
+    }).filter(p => p.duration >= 0);
+
+    // Read <voice_file> element — Gnaural uses this for type-2 sample filenames
+    const vfile = childText(v, ["voice_file"]) || null;
+    return { index:vi, type:rawType, desc:vdesc, file:vfile, muted, visible, mono, points };
+  });
+
+  // total time = max sum of any voice's durations (each voice should run full length)
+  let total = 0;
+  for(const v of voices){
+    const s = v.points.reduce((a,p)=>a+p.duration,0);
+    if(s>total) total = s;
+  }
+  const declared = num(childText(root,["totaltime","schedule_totaltime"]) ?? attr(root,["totaltime"]), 0);
+  if(declared > total) total = declared;
+
+  return { title, author, desc, voices, totalTime: total, ovL, ovR, loops, stereoswap };
+}
+
+/* turn datapoints (durations) into absolute time segments per voice */
+function buildSegments(voice){
+  const segs = []; let t = 0;
+  for(const p of voice.points){
+    segs.push({ t0:t, t1:t+p.duration, beat:p.beat, base:p.base, volL:p.volL, volR:p.volR });
+    t += p.duration;
+  }
+  return segs;
+}
+/* linear-interpolate a voice's parameters at absolute time `t` */
+function sampleVoice(segs, t){
+  if(!segs.length) return null;
+  if(t <= segs[0].t0) { const s=segs[0]; return {beat:s.beat,base:s.base,volL:s.volL,volR:s.volR}; }
+  for(const s of segs){
+    if(t >= s.t0 && t <= s.t1){
+      const span = (s.t1 - s.t0) || 1;
+      const f = (t - s.t0)/span;
+      // interpolate toward the NEXT segment's start values (Gnaural ramps across a datapoint)
+      const next = segs[segs.indexOf(s)+1];
+      const end = next ? next : s;
+      return {
+        beat: s.beat + (end.beat - s.beat)*f,
+        base: s.base + (end.base - s.base)*f,
+        volL: s.volL + (end.volL - s.volL)*f,
+        volR: s.volR + (end.volR - s.volR)*f
+      };
+    }
+  }
+  const last = segs[segs.length-1];
+  return {beat:last.beat,base:last.base,volL:last.volL,volR:last.volR};
+}
+
+/* ============================ Audio engine (native proxy) ============================
+   Audio synthesis now lives in native Kotlin (see docs/CONTRACT_native-audio.md §5/§6).
+   This class is a THIN PROXY over the WebView bridge `window.NativeAudio`. It keeps the exact
+   public surface the UI already calls (running, startOffset, _played, loopsLeft, segCache,
+   fadeOut30s, onTick, setSchedule, play, stop, currentTime, _elapsedSeconds, setMasterVolume,
+   setChannelGains, setLoops, setAudioBuffer, _lookupBuffer, clearAudioBuffers, hasWav-equivalents),
+   but owns NO WebAudio nodes. Transport state (running/elapsed/played/loopsLeft) is a MIRROR
+   updated from `window.NativeAudioEvents` (defined below). The native side owns the playback cursor.
+   If the bridge is absent (e.g. opened outside the Gnauri Android app) transport becomes a no-op
+   and a visible error is shown in #status. */
+class GnauriEngine{
+  constructor(){
+    // ---- UI-facing state mirror (updated by NativeAudioEvents; never authoritative locally) ----
+    this.running=false;
+    this.startOffset=0;          // last-known cursor within one pass (seconds); UI reads/writes it
+    this._played=0;              // completed passes (mirror)
+    this.loopsLeft=0;            // remaining passes; Infinity = infinite (mirror)
+    this._elapsedSecMirror=0;    // full-timeline elapsed reported by native (fixes the JS loop bug)
+    // ---- schedule kept locally for the UI (graph/live-readout use segCache + schedule) ----
+    this.schedule=null; this.segCache=[];
+    this.onTick=null;            // UI playhead/label callback: onTick(currentTimeWithinPass)
+    this._uiVol=1;
+    this.fadeOut30s=true;        // mirrors native setFadeOut30s; default true (contract §4.9)
+    // per-channel L/R output trim (0..1.5), remembered so it can be (re)applied whenever available
+    this._chL=1; this._chR=1;
+    // legacy field some UI paths poke; unused by the native engine but kept so writes don't throw
+    this._elapsedAccrued=0;
+    // apply any deferred settings once the bridge becomes available
+    this._pushSettings();
+  }
+  // Is the native bridge present? (contract §5.1 isAvailable)
+  _hasNative(){ return !!(window.NativeAudio && typeof window.NativeAudio.play === "function"); }
+  // Surface a hard, visible error when there is no native engine to talk to.
+  _nativeMissing(){
+    try{
+      const s=document.getElementById("status");
+      if(s){ s.textContent="Native audio unavailable — this build requires the Gnauri Android app"; s.classList.add("err"); }
+    }catch(e){}
+  }
+  // (Re)send the local settings mirror to native. Safe to call any time; no-op without the bridge.
+  // Note: native applies the schedule's overall volume (ovL/ovR) itself (contract §3), so we send
+  // the raw UI volume here and must NOT pre-multiply by ov (that would double-apply it as ov²).
+  _pushSettings(){
+    if(!this._hasNative()) return;
+    try{
+      window.NativeAudio.setMasterVolume(this._uiVol);
+      window.NativeAudio.setChannelGains(this._chL, this._chR);
+      window.NativeAudio.setFadeOut30s(!!this.fadeOut30s);
+    }catch(e){}
+  }
+  // ---- Full-timeline elapsed. Mirrored from native (which fixes the JS infinite-loop display
+  //      bug); falls back to a local estimate before the first tick arrives. ----
+  _elapsedSeconds(){
+    if(this.running || this._elapsedSecMirror>0) return this._elapsedSecMirror;
+    if(!this.schedule) return 0;
+    // stopped/seeked-while-stopped: reflect the cursor the UI parked at
+    if(this.schedule.loops > 0) return (this._played * this.schedule.totalTime) + this.startOffset;
+    return this.startOffset;
+  }
+  // normalize a filename for matching: lowercase, strip any path, trim whitespace (contract §3)
+  _normName(s){ return String(s||"").trim().toLowerCase().replace(/^.*[\\/]/,""); }
+  // WAV registry is native-owned. setAudioBuffer is a no-op kept for call-site compatibility
+  // (native decodes WAVs from the SAF URIs captured at file-pick time — contract §5.5).
+  setAudioBuffer(name, buffer){ /* no-op: native owns the WAV registry */ }
+  // Clear all registered WAVs (contract §5.1 clearWavs).
+  clearAudioBuffers(){ if(this._hasNative()){ try{ window.NativeAudio.clearWavs(); }catch(e){} } }
+  // Does native have a decodable WAV for this type-2 voice descriptor? Match exact, then with a
+  // ".wav" suffix appended (contract §3 / index.html hasBuffer fallback). Returns truthy/falsey
+  // so existing UI `!engine._lookupBuffer(...)` checks keep working.
+  _lookupBuffer(desc){
+    if(!this._hasNative()) return null;
+    const n=this._normName(desc);
+    try{
+      if(window.NativeAudio.hasWav(n)) return n;
+      if(window.NativeAudio.hasWav(n+".wav")) return n+".wav";
+    }catch(e){}
+    return null;
+  }
+  // Kept for API compatibility with the old engine; native builds the audio graph itself so there
+  // is nothing to initialize here. (Formerly created the AudioContext.)
+  _ensureCtx(){ /* no-op: no WebAudio context in the native build */ }
+  // set the global L/R output trim (0..1.5). Applies live via the bridge; remembered by the UI.
+  setChannelGains(l, r){
+    this._chL=Math.max(0,Math.min(1.5, isFinite(l)?l:1));
+    this._chR=Math.max(0,Math.min(1.5, isFinite(r)?r:1));
+    if(this._hasNative()){ try{ window.NativeAudio.setChannelGains(this._chL, this._chR); }catch(e){} }
+  }
+  // a schedule's `loops` is 0 => infinite, N>0 => play N times. loopsLeft mirrors this
+  // with Infinity standing in for "infinite" so the countdown logic stays simple.
+  _loopsFromSched(){ return this.schedule.loops===0 ? Infinity : this.schedule.loops; }
+  // Store the schedule locally for the UI (graph + live readout use segCache), then hand a JSON
+  // copy to native. `loadSchedule` returns {"missing":[...]} — surfaced via the status message
+  // (contract §5.1); while playing, native hot-applies (§5.6). No local playback restart needed.
+  setSchedule(sched, reset = false){
+    this.schedule = sched;
+    this.segCache = sched.voices.map(buildSegments);
+    this.loopsLeft = this._loopsFromSched();
+    this._loadScheduleNative(reset);
+  }
+  // Send the current local schedule to native and surface any missing-WAV report.
+  _loadScheduleNative(reset = false){
+    if(!this.schedule) return;
+    if(!this._hasNative()){ this._nativeMissing(); return; }
+    try{
+      let res;
+      if (reset && typeof window.NativeAudio.loadScheduleReset === "function") {
+        res = window.NativeAudio.loadScheduleReset(JSON.stringify(this.schedule));
+      } else {
+        res = window.NativeAudio.loadSchedule(JSON.stringify(this.schedule));
+      }
+      // (re)apply settings; native applies the new schedule's own overall volume (ovL/ovR) itself
+      this._pushSettings();
+      let missing=[];
+      if(res){ try{ const o=JSON.parse(res); if(o && Array.isArray(o.missing)) missing=o.missing; }catch(e){} }
+      if(missing.length){
+        const note=`⚠ ${missing.length} audio-file voice${missing.length>1?"s":""} have no WAV loaded (silent): ${missing.slice(0,4).join(", ")}${missing.length>4?"…":""}. Select/drop the .wav files alongside the .gnaural.`;
+        const s=document.getElementById("status");
+        if(s){ s.textContent=note; s.classList.add("err"); }
+      }
+      return missing;
+    }catch(e){ this._nativeMissing(); }
+    return [];
+  }
+  // change repeat count live. Updates the local schedule + mirror, then re-sends the schedule so
+  // native picks up the new loop count (hot-apply while playing — contract §5.6).
+  setLoops(n){
+    if(!this.schedule) return;
+    this.schedule.loops = Math.max(0, Math.floor(n)||0);
+    if(this.running){
+      const target=this._loopsFromSched();
+      this.loopsLeft = target===Infinity ? Infinity : Math.max(1, target - (this._played||0));
+    } else {
+      this.loopsLeft = this._loopsFromSched();
+    }
+    this._loadScheduleNative();
+  }
+  // native applies the schedule's overall volume (ovL/ovR) itself (contract §3); send v raw.
+  setMasterVolume(v){
+    this._uiVol = v;
+    if(this._hasNative()){ try{ window.NativeAudio.setMasterVolume(v); }catch(e){} }
+  }
+  // Start / resume playback. offset semantics (contract §5.1/§6): a number < 0 resumes from the
+  // native cursor; >= 0 restarts at that position within a pass. The UI passes engine.startOffset
+  // on a resume (which equals the current cursor, so native treats it as resume) and passes -1 is
+  // also honored. Native owns the cursor and drives the mirror via NativeAudioEvents.
+  play(offset){
+    this._ignoreTicksUntilZero = false;
+    if(!this._hasNative()){ this._nativeMissing(); return; }
+    const off = (offset==null || !isFinite(offset)) ? -1 : offset;
+    try{ window.NativeAudio.play(off); }catch(e){ this._nativeMissing(); }
+  }
+  // Pause: keep cursor & played count (contract §5.1 pause). Used by the play/pause toggle.
+  stop(){
+    if(!this._hasNative()){ this.running=false; return; }
+    try{ window.NativeAudio.pause(); }catch(e){}
+  }
+  // Full stop + reset cursor/played (contract §5.1 stopReset). Routed from the Stop button.
+  stopReset(){
+    if(!this._hasNative()){ this.running=false; return; }
+    try{ window.NativeAudio.stopReset(); }catch(e){}
+  }
+  // Seek to a full-timeline elapsed position (seconds). Native maps it to (played, cursor) and
+  // updates the mirror via onTick (contract §5.1 seekElapsed / §6 seek handler).
+  seekElapsed(sec){
+    this._ignoreTicksUntilZero = false;
+    if(!this._hasNative()){ this._nativeMissing(); return; }
+    try{ window.NativeAudio.seekElapsed(sec); }catch(e){}
+  }
+  // fadeOut30s is a native setting; expose it as a property with a setter that forwards to native.
+  get fadeOut30s(){ return this._fadeOut30s; }
+  set fadeOut30s(b){
+    this._fadeOut30s = !!b;
+    if(this._hasNative()){ try{ window.NativeAudio.setFadeOut30s(this._fadeOut30s); }catch(e){} }
+  }
+  // Current time WITHIN a single pass (seconds), for the graph playhead. Derived from the mirrored
+  // full-timeline elapsed modulo the pass length; falls back to the parked cursor when stopped.
+  currentTime(){
+    if(!this.schedule) return this.startOffset;
+    const total = this.schedule.totalTime || 1;
+    if(this.running || this._elapsedSecMirror>0){
+      const t = this._elapsedSecMirror % total;
+      // at an exact pass boundary show the end of the pass rather than 0
+      return (this._elapsedSecMirror>0 && t===0) ? total : Math.min(t, total);
+    }
+    return Math.min(this.startOffset, total);
+  }
+}
+
+/* ============================ Timeline graph ============================ */
+class Graph{
+  constructor(canvas){
+    this.cv=canvas; this.ctx=canvas.getContext("2d");
+    this.sched=null; this.playT=0; this.hoverT=null; this.lockT=null; this.view="beat";
+    this.lockY=null;            // css-y of the last tap, used to pick the nearest curve to edit
+    this.selVoice=null;         // index of the voice whose line was tapped (null = empty space)
+    this.onEditRequest=null;    // wiring sets this; called with (voiceIndex, time) when Edit is tapped
+    this.pad={l:46,r:14,t:14,b:24};
+    this.tip=document.getElementById("graphTip");
+    new ResizeObserver(()=>this.resize()).observe(canvas);
+
+    // map a pointer event to css-y inside the canvas
+    this._cssYOf=(clientY)=>{ const r=canvas.getBoundingClientRect(); return clientY-r.top; };
+
+    // Map a pointer event to a time on the timeline (or null if outside the plot area).
+    // We work in CSS pixels (getBoundingClientRect) so the HTML tooltip can be positioned
+    // with the same coordinate system.
+    const timeAt=(clientX, clamp=false)=>{
+      const r=canvas.getBoundingClientRect();
+      const cssX=clientX-r.left;
+      const {l,r:rr}=this.pad; const w=(this._w||r.width)-l-rr;
+      if(!this.sched) return null;
+      if(clamp){
+        const clampedX = Math.max(l, Math.min(l+w, cssX));
+        return (clampedX-l)/w*this.sched.totalTime;
+      }
+      if(cssX<l||cssX>l+w) return null;
+      return (cssX-l)/w*this.sched.totalTime;
+    };
+
+    // Hover / drag: live (non-pinned) tooltip that follows the finger/cursor.
+    // IMPORTANT: when a point is PINNED (lockT set) we leave the pinned tooltip exactly as-is and
+    // do NOT redraw it on hover. Redrawing rebuilds its HTML — including the Edit button — which
+    // would destroy the button the moment the mouse moves toward it (the reported bug). So while a
+    // point is locked, hover only updates the dashed guide line, never the tooltip.
+    canvas.addEventListener("pointermove",e=>{
+      if(this.dragStart){
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        if(!this.isDragging && (Math.abs(dx)>5 || Math.abs(dy)>5)){
+          this.isDragging = true;
+          this._hideTip();
+          this.lockT = null;
+        }
+        if(this.isDragging){
+          this.dragCurrent = { x: e.clientX, y: e.clientY, cssY: this._cssYOf(e.clientY), t: timeAt(e.clientX, true) };
+          this.draw();
+          return;
+        }
+      }
+      const t=timeAt(e.clientX);
+      this.hoverT=t;
+      if(this.lockT!=null){ this.draw(); return; }   // pinned: keep tooltip+button untouched
+      if(t==null){ this._hideTip(); }
+      else this._drawTip(t,false);
+      this.draw();
+    });
+    canvas.addEventListener("pointerleave",()=>{
+      this.hoverT=null;
+      // pinned: leave the tooltip (and its Edit button) exactly as drawn so it can be clicked.
+      if(this.lockT!=null){ this.draw(); return; }
+      this._hideTip();
+      this.draw();
+    });
+    // Tap / click: pin the point at that time.
+    //  - Tapping OUTSIDE the plot clears everything.
+    //  - Tapping ON a voice's line (within HIT_PX in y) SELECTS that voice: the tooltip then shows
+    //    only that voice and offers its Edit button.
+    //  - Tapping EMPTY space inside the plot pins the time and shows the full all-voice tooltip,
+    //    but with NO Edit button (nothing specific selected).
+    canvas.addEventListener("pointerdown",e=>{
+      const t=timeAt(e.clientX);
+      if(t==null){ this.lockT=null; this.lockY=null; this.selVoice=null; this._hideTip(); this.draw(); return; }
+      canvas.setPointerCapture(e.pointerId);
+      this.dragStart = { x: e.clientX, y: e.clientY, cssY: this._cssYOf(e.clientY), t: t };
+      this.isDragging = false;
+      this.dragCurrent = null;
+    });
+    
+    canvas.addEventListener("pointerup",e=>{
+      if(!this.dragStart) return;
+      canvas.releasePointerCapture(e.pointerId);
+      if(this.isDragging && this.dragCurrent){
+        this._handleDragEnd();
+      } else {
+        // It was a tap
+        const t = this.dragStart.t;
+        const cssY = this.dragStart.cssY;
+        const hit=this._voiceHitAt(t,cssY);     // {voiceIndex,dist} or null
+        this.lockT=t; this.hoverT=t; this.lockY=cssY;
+        this.selVoice = hit ? hit.voiceIndex : null;
+        this._drawTip(t,true);
+      }
+      this.dragStart = null;
+      this.dragCurrent = null;
+      this.isDragging = false;
+      this.draw();
+    });
+    
+    canvas.addEventListener("pointercancel",e=>{
+      if(!this.dragStart) return;
+      canvas.releasePointerCapture(e.pointerId);
+      this.dragStart = null;
+      this.dragCurrent = null;
+      this.isDragging = false;
+      this.draw();
+    });
+  }
+  // Hit-test: is the tap close enough (in y) to a visible voice's plotted line to count as selecting
+  // it? Returns {voiceIndex,dist} for the nearest within HIT_PX, else null (= empty space).
+  _voiceHitAt(t, cssY){
+    if(this.sched==null || cssY==null) return null;
+    const HIT_PX=18;
+    const rows=this._rowsForGeometry(t);
+    let best=null, bestD=Infinity;
+    for(const r of rows){
+      // consider both the L (or only) curve y and, in volume view, the R curve yR
+      const cands=[r.y]; if(r.yR!=null) cands.push(r.yR);
+      for(const cy of cands){ const d=Math.abs(cy-cssY); if(d<bestD){ bestD=d; best=r; } }
+    }
+    if(best && bestD<=HIT_PX) return { voiceIndex:best.v.index, dist:bestD };
+    return null;
+  }
+  // Geometry rows (one per visible voice) for the current view, used by hit-testing and selection.
+  // Mirrors _readout but always yields a row for every visible voice (falls back to volume-L y when
+  // the current view doesn't plot a voice, e.g. noise in beat view), so any line is selectable.
+  _handleDragEnd(){
+    console.log("Drag end called", this.dragStart, this.dragCurrent);
+    if(!this.dragStart || !this.dragCurrent) return;
+    const t1 = Math.min(this.dragStart.t, this.dragCurrent.t);
+    const t2 = Math.max(this.dragStart.t, this.dragCurrent.t);
+    const y1 = Math.min(this.dragStart.cssY, this.dragCurrent.cssY);
+    const y2 = Math.max(this.dragStart.cssY, this.dragCurrent.cssY);
+    
+    if(this.onMassEditRequest){
+      console.log("Calling onMassEditRequest", t1, t2, y1, y2);
+      this.onMassEditRequest(t1, t2, y1, y2, this.view);
+    }
+  }
+  _rowsForGeometry(t){
+    let rows=this._readout(t);
+    const seen=new Set(rows.map(r=>r.v.index));
+    const {t:pt,b}=this.pad; const gh=(this._h||340)-pt-b;
+    for(const v of this.sched.voices){
+      if(!v.visible || seen.has(v.index)) continue;
+      const s=sampleVoice(buildSegments(v),t); if(!s) continue;
+      rows.push({v, y:pt+gh-(s.volL)*gh});
+    }
+    return rows;
+  }
+  // Pick the visible voice whose plotted curve is closest in y to the tap, at the locked time.
+  // ALL visible voices are editable now: tone-like voices (binaural/isochronic) can edit
+  // beat/carrier/volume; every other type (noise, audio file, …) can edit volume only. Returns
+  // {voiceIndex, time, pointIndex, point} or null. The "saved point" is the datapoint whose start
+  // time (segment t0) is nearest to t.
+  _nearestEditableAt(t, cssY){
+    if(!this.sched) return null;
+    const rows=this._rowsForGeometry(t);
+    if(!rows.length) return null;
+    let best=rows[0], bestD=Infinity;
+    if(cssY!=null){
+      for(const r of rows){ const d=Math.abs(r.y-cssY); if(d<bestD){bestD=d;best=r;} }
+    }
+    return this._editTargetForVoice(best.v.index, t);
+  }
+  // Build an edit target (voiceIndex + nearest saved datapoint) for a specific voice index.
+  _editTargetForVoice(vi, t){
+    const v=this.sched.voices[vi]; if(!v) return null;
+    const segs=buildSegments(v);
+    // nearest saved datapoint = the point whose start time t0 is closest to t
+    let pi=0, pd=Infinity;
+    for(let i=0;i<segs.length;i++){ const d=Math.abs(segs[i].t0-t); if(d<pd){pd=d;pi=i;} }
+    return { voiceIndex:vi, time:segs[pi]?segs[pi].t0:t, pointIndex:pi, point:v.points[pi] };
+  }
+  // value of every voice at time t for the current view, for tooltip + dots
+  _readout(t){
+    const rows=[];
+    for(const v of this.sched.voices){
+      if(!v.visible) continue;
+      const segs=buildSegments(v); const s=sampleVoice(segs,t); if(!s) continue;
+      let val,y;
+      const {t:pt,b}=this.pad; const gh=(this._h||340)-pt-b;
+      if(this.view==="beat"){ if(!isTone(v.type)) continue; val=`${s.beat.toFixed(2)} Hz`; y=pt+gh-(s.beat/this.maxBeat)*gh; rows.push({v,val,y}); }
+      else if(this.view==="base"){ if(!showsBase(v,segs)) continue; val=`${s.base.toFixed(0)} Hz`; y=pt+gh-(s.base/this.maxBase)*gh; rows.push({v,val,y}); }
+      else { // volume — show L and R; dot on the L curve
+        val=`L ${(s.volL*100).toFixed(0)}% · R ${(s.volR*100).toFixed(0)}%`;
+        y=pt+gh-(s.volL)*gh; rows.push({v,val,y,yR:pt+gh-(s.volR)*gh}); }
+    }
+    return rows;
+  }
+  // position + fill the HTML tooltip above the cursor/finger; `locked` styles it as pinned
+  _drawTip(t,locked){
+    if(!this.sched||!this.tip) return;
+    // If a specific voice's line was selected (selVoice set), show ONLY that voice. Otherwise show
+    // every visible voice at this time (the all-voice readout).
+    const selectedOnly = locked && this.selVoice!=null;
+    let rows=this._readout(t);
+    if(selectedOnly) rows=rows.filter(r=>r.v.index===this.selVoice);
+    let html=`<div class="tt">⏱ ${fmt(t)}${locked?'  📌':''}</div>`;
+    if(rows.length){
+      for(const r of rows){
+        html+=`<div class="vrow"><span class="dot" style="background:${voiceColor(r.v.index)}"></span>`+
+              `<span class="vname">${(r.v.desc||("Voice "+r.v.index))}</span>`+
+              `<span class="vval">${r.val}</span></div>`;
+      }
+    } else { html+=`<div class="vrow"><span class="vname">no visible voice here</span></div>`; }
+    // Offer an Edit button ONLY when a specific voice line is selected. Tapping empty space pins the
+    // time and shows the full readout with no Edit button. Tone-like voices edit beat/carrier/volume;
+    // other types (noise, audio file, …) edit volume only.
+    let editTarget=null;
+    if(selectedOnly){
+      editTarget=this._editTargetForVoice(this.selVoice,t);
+      if(editTarget){
+        const v=this.sched.voices[editTarget.voiceIndex];
+        const label = isTone(v.type) ? (v.type===0?"beat":"pulse") : "volume";
+        html+=`<div style="display:flex; flex-direction:column; gap:4px;" 
+                 onclick="event.stopPropagation(); return false;" 
+                 onpointerdown="event.stopPropagation(); return false;"
+                 onpointerup="event.stopPropagation(); return false;"
+                 onmousedown="event.stopPropagation(); return false;"
+                 onmouseup="event.stopPropagation(); return false;"
+                 onmousemove="event.stopPropagation(); return false;">
+          <button class="editbtn" id="tipEditBtn" onpointerdown="event.stopPropagation(); return false;" onmousedown="event.stopPropagation(); return false;">✎ Edit point</button>
+          <button class="editbtn" id="tipMassEditBtn" onpointerdown="event.stopPropagation(); return false;" onmousedown="event.stopPropagation(); return false;">🪄 Mass adjust whole voice</button>
+        </div>`;
+      }
+      html+=`<div class="lockbadge">tap a line to select · tap empty space to clear</div>`;
+    } else if(locked){
+      html+=`<div class="lockbadge">tap a voice line to edit it · tap empty space to clear</div>`;
+    }
+    this.tip.innerHTML=html;
+    this.tip.classList.add("show");
+    this.tip.classList.toggle("locked",!!locked);
+    if(editTarget){
+      const btn=this.tip.querySelector("#tipEditBtn");
+      if(btn) btn.onpointerdown=(ev)=>{ ev.stopPropagation(); };
+      if(btn) btn.onclick=(ev)=>{ ev.stopPropagation();
+        if(this.onEditRequest) this.onEditRequest(editTarget.voiceIndex, editTarget.time); };
+      const massBtn=this.tip.querySelector("#tipMassEditBtn");
+      if(massBtn) massBtn.onpointerdown=(ev)=>{ ev.stopPropagation(); };
+      if(massBtn) massBtn.onclick=(ev)=>{ ev.stopPropagation();
+        if(this.onMassEditVoiceRequest) this.onMassEditVoiceRequest(editTarget.voiceIndex, this.view); };
+    }
+    // position: anchor centred above the point. The CSS transform lifts it fully above the
+    // anchor (translate -50%,-100%) and we add an extra gap so a fingertip never covers it.
+    const cssX=this._x(t);
+    const GAP=18;                 // px above the anchor — keeps the card clear of the finger
+    let topY=this.pad.t + 4;      // pin near the top of the plot so it's always above the finger
+    // clamp horizontally so the card stays inside the canvas width
+    const w=this._w||this.cv.width;
+    const half=this.tip.offsetWidth/2;
+    const clampedX=Math.max(half+2, Math.min(cssX, w-half-2));
+    this.tip.style.left=clampedX+"px";
+    this.tip.style.top=(topY+GAP)+"px";
+  }
+  _hideTip(){ if(this.tip) this.tip.classList.remove("show"); }
+  resize(){
+    const r=this.cv.getBoundingClientRect();
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    this.cv.width=Math.max(320,r.width*dpr); this.cv.height=340*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0);
+    this._w=r.width; this._h=340;
+    if(this.lockT!=null) this._drawTip(this.lockT,true);
+    this.draw();
+  }
+  recomputeScales(){
+    if(!this.sched) return;
+    let maxBeat=1,maxBase=1,maxVol=0.01;
+    for(const v of this.sched.voices){
+      for(const p of v.points){ maxVol=Math.max(maxVol,p.volL,p.volR); if(isTone(v.type)){ maxBeat=Math.max(maxBeat,p.beat); maxBase=Math.max(maxBase,p.base);} }
+    }
+    this.maxBeat=Math.ceil(maxBeat*1.1)||1; this.maxBase=Math.ceil(maxBase*1.1)||1;
+    this.maxVol=maxVol*1.1;
+  }
+  setSchedule(s){
+    this.sched=s;
+    this.lockT=null; this.hoverT=null; this.selVoice=null; this._hideTip();
+    this.recomputeScales();
+    this.resize();
+  }
+  setPlay(t){ this.playT=t; this.draw(); }
+  setView(v){ this.view=v; if(this.lockT!=null) this._drawTip(this.lockT,true); this.draw(); }
+  _x(t){ const {l,r}=this.pad; const w=(this._w||this.cv.width)-l-r; return l+(t/(this.sched.totalTime||1))*w; }
+  draw(){
+    const c=this.ctx, W=this._w||this.cv.width, H=this._h||this.cv.height;
+    const {l,r,t:pt,b}=this.pad; const gw=W-l-r, gh=H-pt-b;
+    c.clearRect(0,0,W,H);
+    if(!this.sched){ return; }
+    c.fillStyle="#1d273d"; c.fillRect(l,pt,gw,gh);
+    // grid + time axis
+    c.strokeStyle="#212c44"; c.fillStyle="#8a97b8"; c.font="10px system-ui"; c.lineWidth=1;
+    const total=this.sched.totalTime||1;
+    const ticks=6;
+    for(let i=0;i<=ticks;i++){
+      const x=l+gw*i/ticks; c.beginPath(); c.moveTo(x,pt); c.lineTo(x,pt+gh); c.stroke();
+      const sec=total*i/ticks; c.fillText(fmt(sec), x-12, pt+gh+14);
+    }
+    // ---- Y-axis: granular but tidy. We label several gridlines (not just min/max) using a
+    // "nice" rounded step (1/2/5 ×10ⁿ). On narrow (phone) widths we draw FEWER lines so it stays
+    // readable rather than cramped. Volume is always the fixed 0–100% scale.
+    const axisMax = this.view==="beat" ? this.maxBeat
+                  : this.view==="base" ? this.maxBase
+                  : 1;
+    const isVolume = this.view==="volume";
+    if(this.isDragging && this.dragStart && this.dragCurrent){
+      const x1 = l + (this.dragStart.t / total) * gw;
+      const x2 = l + (this.dragCurrent.t / total) * gw;
+      const y1 = this.dragStart.cssY;
+      const y2 = this.dragCurrent.cssY;
+      c.fillStyle = "rgba(90, 209, 196, 0.2)";
+      c.strokeStyle = "rgba(90, 209, 196, 0.8)";
+      c.lineWidth = 1;
+      c.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+      c.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    }
+    const narrow = (this._w||this.cv.width) < 460;   // phone-ish: thin out the labels
+    // choose a "nice" step so labels are round numbers; aim for ~targetLines intervals
+    const niceStep=(max,target)=>{
+      const raw=max/target;
+      const mag=Math.pow(10,Math.floor(Math.log10(raw)||0));
+      const n=raw/mag;
+      const step = n<=1?1 : n<=2?2 : n<=2.5?2.5 : n<=5?5 : 10;
+      return step*mag;
+    };
+    c.fillStyle="#8a97b8"; c.textBaseline="middle";
+    if(isVolume){
+      // volume: 0–100%. Show 0/25/50/75/100%.
+      const vals = [0,25,50,75,100];
+      for(const pctv of vals){
+        const y=pt+gh-(pctv/100)*gh;
+        c.strokeStyle="#212c44"; c.beginPath(); c.moveTo(l,y); c.lineTo(l+gw,y); c.stroke();
+        c.fillText(pctv+"%", 6, y);
+      }
+    } else {
+      const target = narrow ? 5 : 8;                 // intervals; fewer on phone
+      const step = niceStep(axisMax||1, target) || 1;
+      const stepStr = step.toString();
+      const dotIdx = stepStr.indexOf('.');
+      const decimals = dotIdx === -1 ? 0 : stepStr.length - dotIdx - 1;
+      // numbers only (the view toggle already says Beat/Base in Hz) — keeps the gutter uncluttered
+      const lastTop = pt+gh-(Math.floor((axisMax+1e-6)/step)*step/(axisMax||1))*gh;
+      for(let val=0; val<=axisMax+1e-6; val+=step){
+        const y=pt+gh-(val/(axisMax||1))*gh;
+        if(y<pt-0.5) break;
+        c.strokeStyle="#212c44"; c.beginPath(); c.moveTo(l,y); c.lineTo(l+gw,y); c.stroke();
+        c.fillText(val.toFixed(decimals), 6, y);
+      }
+      // label the exact ceiling (max) too, unless the top step already sits right at it
+      if(Math.abs(lastTop-pt) > 12) c.fillText(axisMax.toFixed(decimals), 6, pt+1);
+    }
+    c.textBaseline="alphabetic";
+
+    const plot=(getY,color,lw)=>{
+      c.strokeStyle=color; c.lineWidth=lw||2; c.beginPath(); let started=false;
+      const N=Math.max(2,Math.floor(gw));
+      for(let i=0;i<=N;i++){
+        const tt=total*i/N; const y=getY(tt); if(y==null) continue;
+        const x=l+gw*i/N;
+        if(!started){c.moveTo(x,y);started=true;} else c.lineTo(x,y);
+      }
+      c.stroke();
+    };
+    // plot ONLY the selected parameter, one curve per visible voice (its own colour).
+    // For Volume view, Left is solid and Right is dashed; tone vs noise irrelevant here.
+    // When a voice line is selected, draw it thicker and dim the others so the selection is obvious.
+    const hasSel = this.selVoice!=null;
+    for(const v of this.sched.voices){
+      if(!v.visible) continue;
+      const isSel = hasSel && v.index===this.selVoice;
+      const col=voiceColor(v.index);
+      const lw = isSel ? 3.5 : 2;
+      c.globalAlpha = (hasSel && !isSel) ? 0.30 : 1;
+      const segs=buildSegments(v);
+      if(this.view==="beat"){
+        if(!isTone(v.type)){ c.globalAlpha=1; continue; } // beat/pulse only for tone & isochronic
+        plot(tt=>{const s=sampleVoice(segs,tt); return s? pt+gh-(s.beat/this.maxBeat)*gh : null;}, col, lw);
+      } else if(this.view==="base"){
+        if(!showsBase(v,segs)){ c.globalAlpha=1; continue; }
+        plot(tt=>{const s=sampleVoice(segs,tt); return s? pt+gh-(s.base/this.maxBase)*gh : null;}, col, lw);
+      } else { // volume
+        plot(tt=>{const s=sampleVoice(segs,tt); return s? pt+gh-(s.volL)*gh : null;}, col, lw);
+        c.setLineDash([4,3]);
+        plot(tt=>{const s=sampleVoice(segs,tt); return s? pt+gh-(s.volR)*gh : null;}, col, lw);
+        c.setLineDash([]);
+      }
+    }
+    c.globalAlpha=1;
+    // playhead
+    const px=this._x(this.playT);
+    c.strokeStyle="#fff"; c.lineWidth=1.5; c.beginPath(); c.moveTo(px,pt);c.lineTo(px,pt+gh);c.stroke();
+
+    // hover guide line (light, dashed) — follows the finger/cursor while moving
+    if(this.hoverT!=null && this.hoverT!==this.lockT){
+      const hx=this._x(this.hoverT);
+      c.strokeStyle="rgba(255,255,255,.30)"; c.setLineDash([3,3]); c.lineWidth=1;
+      c.beginPath();c.moveTo(hx,pt);c.lineTo(hx,pt+gh);c.stroke(); c.setLineDash([]);
+    }
+
+    // LOCKED point: a solid guide line + a highlighted dot on every visible curve.
+    if(this.lockT!=null){
+      const lx=this._x(this.lockT);
+      c.strokeStyle="rgba(90,209,196,.55)"; c.setLineDash([2,3]); c.lineWidth=1.5;
+      c.beginPath();c.moveTo(lx,pt);c.lineTo(lx,pt+gh);c.stroke(); c.setLineDash([]);
+      let rows=this._readout(this.lockT);
+      // when a voice line is selected, mark only that voice's dot (matches the single-voice tooltip)
+      if(this.selVoice!=null) rows=rows.filter(rr=>rr.v.index===this.selVoice);
+      for(const rrow of rows){
+        const col=voiceColor(rrow.v.index);
+        const drawDot=(yy)=>{
+          c.beginPath(); c.arc(lx,yy,5,0,Math.PI*2);
+          c.fillStyle=col; c.fill();
+          c.lineWidth=2; c.strokeStyle="#0e1320"; c.stroke();
+          c.lineWidth=1.5; c.strokeStyle="#fff"; c.beginPath(); c.arc(lx,yy,5,0,Math.PI*2); c.stroke();
+        };
+        if(rrow.y!=null) drawDot(rrow.y);
+        if(rrow.yR!=null) drawDot(rrow.yR); // volume view: also mark the Right curve
+      }
+    }
+
+    // Highlight the currently selected mass-edit points
+    if (typeof massEditState !== "undefined" && massEditState && massEditState.allHitsByVoice && massEditState.view === this.view) {
+      const activeVi = massEditState.vi;
+      const axisMax = this.view === "beat" ? this.maxBeat : this.view === "base" ? this.maxBase : 1;
+      
+      for (let [vi, hits] of massEditState.allHitsByVoice.entries()) {
+        const isActive = (activeVi === "all" || vi === activeVi);
+        const col = voiceColor(vi);
+        const fillCol = isActive ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.15)";
+        
+        hits.forEach(h => {
+          const x = this._x(h.time);
+          let pv = h.origVal;
+          if (this.view === "volume") {
+            const p = this.sched.voices[vi].points[h.index];
+            pv = p.volL;
+          }
+          const y = pt + gh - (pv / axisMax) * gh;
+          
+          c.beginPath();
+          c.arc(x, y, isActive ? 8 : 5, 0, Math.PI * 2);
+          c.fillStyle = fillCol;
+          c.fill();
+          c.lineWidth = isActive ? 2 : 1;
+          c.strokeStyle = col;
+          c.stroke();
+        });
+      }
+    }
+  }
+}
+
+/* ============================ wiring ============================ */
+function fmt(s){ s=Math.max(0,Math.round(s)); const m=Math.floor(s/60); const ss=s%60; return m+":"+String(ss).padStart(2,"0"); }
+const typeName=t=>({0:"Tone (binaural)",1:"Pink noise",2:"Audio file",3:"Isochronic",4:"Alt isochronic",5:"White noise",6:"Brown noise"})[t]||("type "+t);
+// "Tone-like" voices carry a meaningful carrier (base) and beat/pulse rate: binaural (0) and
+// the two isochronic types (3,4). Used by the graph/readout so isochronic voices plot like tones.
+const isTone=t=>(t===0||t===3||t===4);
+// Whether a voice's `base` value is a meaningful frequency worth plotting in the "base" view:
+// tone-like voices (carrier), or genuine type-1 pink noise with a bandpass set. For
+// white/brown noise types (5/6) base is a non-frequency character control, so we don't plot it.
+const showsBase=(v,segs)=>isTone(v.type) || (v.type===1 && segs.some(x=>x.base>1));
+const VOICE_COLORS=["#5ad1c4","#ffb454","#a78bfa","#ff6b81","#5ad17a","#6cb6ff","#f78fb3","#e0d060"];
+const voiceColor=i=>VOICE_COLORS[i%VOICE_COLORS.length];
+
+const engine=new GnauriEngine();
+const graph=new Graph(document.getElementById("graph"));
+const $=id=>document.getElementById(id);
+let sched=null;
+let undoStack=[];
+let redoStack=[];
+let currentFileName="";
+
+/* ---- Incoming native audio events (Kotlin → JS, contract §5.2) ----
+   The native engine pushes these ~4 Hz while playing and on every state change. They are the
+   sole source of truth for transport state; the JS engine object only mirrors them. Both handlers
+   are safe no-ops if called before `engine` exists (they don't, since this runs after) and tolerate
+   partial/garbage args. loopsLeft==-1 means infinite (mapped to Infinity). */
+window.NativeAudioEvents = {
+  onTick: function(elapsedSec, played, loopsLeft){
+    if(!engine) return;
+    const e = +elapsedSec;
+    if (engine._ignoreTicksUntilZero) {
+      if (e === 0) {
+        engine._ignoreTicksUntilZero = false;
+      } else {
+        return; // ignore stale ticks from previous schedule
+      }
+    }
+    if(isFinite(e)) engine._elapsedSecMirror = Math.max(0, e);
+    const p = +played;     if(isFinite(p)) engine._played = Math.max(0, Math.floor(p));
+    const ll = +loopsLeft; engine.loopsLeft = (ll < 0 || !isFinite(ll)) ? Infinity : ll;
+    // keep startOffset (the within-pass cursor) in step so a later stopReset/seek-while-stopped
+    // and the loop-hint math have a sensible value even without a schedule loaded.
+    engine.startOffset = engine.currentTime();
+    // drive the existing UI playhead/labels through the same callback the old engine used
+    if(engine.onTick) engine.onTick(engine.currentTime());
+  },
+  onState: function(isPlaying){
+    if(!engine) return;
+    engine.running = !!isPlaying;
+    if(typeof updateTransportUI === "function") updateTransportUI();
+  },
+  onRenderProgress: function(progress, isComplete, error) {
+    if (error) {
+      alert("M4A Rendering error: " + error);
+      updateM4aProgressUI(null);
+      return;
+    }
+    if (isComplete) {
+      updateM4aProgressUI(null);
+      return;
+    }
+    updateM4aProgressUI(progress);
+  }
+};
+
+function updateUndoRedoUI() {
+  const btnUndo = $("undoBtn");
+  const btnRedo = $("redoBtn");
+  if(btnUndo) btnUndo.disabled = (undoStack.length === 0);
+  if(btnRedo) btnRedo.disabled = (redoStack.length === 0);
+}
+
+function pushUndo() {
+  if(!sched) return;
+  undoStack.push(JSON.stringify(sched));
+  if(undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoUI();
+}
+
+function popUndo() {
+  if(undoStack.length === 0) return;
+  redoStack.push(JSON.stringify(sched));
+  if(redoStack.length > 50) redoStack.shift();
+  const stateStr = undoStack.pop();
+  sched = JSON.parse(stateStr);
+  engine.setSchedule(sched); 
+  graph.setSchedule(sched);
+  renderVoices();
+  updateTransportUI();
+  updateUndoRedoUI();
+}
+
+function popRedo() {
+  if(redoStack.length === 0) return;
+  undoStack.push(JSON.stringify(sched));
+  if(undoStack.length > 50) undoStack.shift();
+  const stateStr = redoStack.pop();
+  sched = JSON.parse(stateStr);
+  engine.setSchedule(sched); 
+  graph.setSchedule(sched);
+  renderVoices();
+  updateTransportUI();
+  updateUndoRedoUI();
+}
+
+const btnUndo = $("undoBtn");
+if(btnUndo) btnUndo.onclick = popUndo;
+
+const btnRedo = $("redoBtn");
+if(btnRedo) btnRedo.onclick = popRedo;
+
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    if (e.shiftKey) {
+      popRedo();
+    } else {
+      popUndo();
+    }
+  } else if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    popRedo();
+  }
+});
+
+function load(xml, name){
+  currentFileName = name || "";
+  try{
+    // Stop anything currently playing before swapping schedules, so the previous
+    // schedule doesn't keep sounding under the new one. The new schedule lands paused
+    // at 0:00, waiting for an explicit Play press (audio needs a user gesture anyway).
+    engine.stopReset();
+    engine.running = false;
+    engine.startOffset = 0;
+    engine._played = 0;
+    engine._elapsedAccrued = 0;
+    engine._elapsedSecMirror = 0;
+    engine._ignoreTicksUntilZero = true;
+    updateTransportUI();
+    sched=parseGnaural(xml);
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoUI();
+    engine.setSchedule(sched, true); graph.setSchedule(sched);
+    $("status").textContent="Loaded: "+(name||sched.title);
+    $("status").classList.remove("err");
+    $("metaBox").style.display="block";
+    $("dropZone").style.display="none";
+    $("playerPanel").style.display="block";
+    $("exportBtn").style.display="inline-flex";
+    $("exportM4aBtn").style.display="inline-flex";
+    $("graphPanel").style.display="block";
+    $("voicePanel").style.display="block";
+    $("mTitle").textContent=sched.title;
+    $("mDur").textContent=fmt(sched.totalTime)+" ("+Math.round(sched.totalTime)+"s)";
+    $("mVoices").textContent=sched.voices.length;
+    if (sched.desc && sched.desc !== "—" && sched.desc.trim()) {
+      $("mDesc").textContent=sched.desc;
+      $("mDescBox").style.display="block";
+    } else {
+      $("mDescBox").style.display="none";
+    }
+    renderVoices(); setupVoiceHeaders();
+    $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched.totalTime, sched.loops) + "</strong>";
+    $("seek").value=0; graph.setPlay(0);
+    graph.setView($("viewSeg").querySelector(".on").dataset.view);
+    syncLoopUI();
+    // if the schedule has audio-file voices, warn about any whose WAV wasn't supplied
+    checkMissingAudio();
+  }catch(e){
+    $("status").textContent="Parse error: "+e.message;
+    $("status").classList.add("err");
+  }
+}
+// Edit-while-playing: hand the (mutated) schedule to native, which hot-applies at the same
+// elapsed position while playing or just replaces it while stopped (contract §5.6). Native owns
+// the cursor, so there is no local stop/play dance any more.
+function restartIfPlaying(){ engine._loadScheduleNative(); }
+function renderVoices(){
+  const tb=$("voiceTbl").querySelector("tbody"); tb.innerHTML="";
+  sched.voices.forEach(v=>{
+    const tr=document.createElement("tr");
+    if(v.muted) tr.classList.add("muted-row");
+    const sw=`<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${voiceColor(v.index)};margin-right:6px;vertical-align:middle"></span>`;
+    const vname = v.desc||("Voice "+v.index);
+    tr.innerHTML=`<td class="col-idx">${v.index}</td>
+      <td class="col-voice" title="${vname}">${sw}${vname}</td>
+      <td class="col-type"><span class="pill">${typeName(v.type)}</span></td>
+      <td class="col-pts">${v.points.length}</td>
+      <td class="col-view"><span class="toggle" data-act="view" data-vi="${v.index}">${v.visible?"👁":"—"}</span></td>
+      <td class="col-mute"><span class="toggle" data-act="mute" data-vi="${v.index}">${v.muted?"🔇":"🔊"}</span></td>
+      <td class="col-solo"><span class="toggle" data-act="solo" data-vi="${v.index}">solo</span></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll(".toggle").forEach(el=>el.onclick=()=>{
+    const vi=+el.dataset.vi, act=el.dataset.act, v=sched.voices[vi];
+    if(act==="view"){ pushUndo(); v.visible=!v.visible; graph.draw(); renderVoices(); return; }
+    // muting also hides the voice from the graph; unmuting re-shows it
+    if(act==="mute"){ pushUndo(); v.muted=!v.muted; v.visible=!v.muted; restartIfPlaying(); graph.draw(); renderVoices(); return; }
+    if(act==="solo"){ pushUndo(); const onlyThis=sched.voices.every((x,i)=>i===vi?!x.muted:x.muted);
+      sched.voices.forEach((x,i)=>{ x.muted = onlyThis ? false : i!==vi; x.visible=!x.muted; }); // solo: only this audible+shown
+      restartIfPlaying(); graph.draw(); renderVoices(); return; }
+  });
+}
+function setupVoiceHeaders(){
+  $("viewAll").onclick=()=>{ pushUndo(); const any=sched.voices.some(v=>!v.visible); sched.voices.forEach(v=>v.visible=any); graph.draw(); renderVoices(); };
+  $("muteAll").onclick=()=>{ pushUndo(); const any=sched.voices.some(v=>!v.muted); sched.voices.forEach(v=>{ v.muted=any; v.visible=!v.muted; }); restartIfPlaying(); graph.draw(); renderVoices(); };
+}
+
+// transport
+$("playBtn").onclick=()=>{
+  if(!sched) return;
+  // Running => pause (native keeps cursor & played). Stopped/paused => resume from the native
+  // cursor via play(-1). If the schedule already finished, rewind to the start first (the native
+  // engine owns the cursor, so we seek it back to 0 before resuming).
+  if(engine.running){ engine.stop(); updateTransportUI(); }
+  else {
+    const totalPlayback = sched.loops > 0 ? sched.totalTime * sched.loops : sched.totalTime;
+    const isFinished = engine._elapsedSeconds() >= totalPlayback;
+    if(isFinished){ engine.seekElapsed(0); }
+    engine.play(-1);
+    updateTransportUI();
+  }
+};
+/* ---- L/R channel balance (global, persisted on this device) ----
+   A single center-detented balance control so the user can correct Left vs Right for their
+   headphones/ears. ONE value `bal` in -100..+100: 0 = centered (both channels at unity). Negative
+   leans left (attenuate RIGHT); positive leans right (attenuate LEFT). It never boosts above unity,
+   so there is no clipping risk. Independent of any schedule and of per-voice volume — applied in the
+   engine after the master gain. Persisted to localStorage so it survives reloads and app restarts. */
+const BAL_KEY="gnauri.balance.v2";
+function loadBalance(){
+  try{
+    const s=JSON.parse(localStorage.getItem(BAL_KEY)||"null");
+    if(s && isFinite(s.bal)) return Math.max(-100,Math.min(100,s.bal));
+    // migrate the old two-channel format (v1): derive a balance from the L/R difference.
+    // r-l: if L was louder (l>r) the result is negative => lean left; if R louder => positive.
+    const old=JSON.parse(localStorage.getItem("gnauri.balance.v1")||"null");
+    if(old && isFinite(old.l) && isFinite(old.r)){
+      return Math.max(-100,Math.min(100,Math.round(old.r-old.l)));
+    }
+  }catch(e){}
+  return 0;   // centered
+}
+function saveBalance(bal){ try{ localStorage.setItem(BAL_KEY, JSON.stringify({bal})); }catch(e){} }
+// derive per-channel gains from the single balance value (0..1, never above unity)
+function balToGains(bal){
+  const gL = bal>0 ? 1 - bal/100 : 1;   // lean right => quieter left
+  const gR = bal<0 ? 1 + bal/100 : 1;   // lean left  => quieter right
+  return {gL, gR};
+}
+function applyBalance(bal){
+  const {gL,gR}=balToGains(bal);
+  engine.setChannelGains(gL, gR);
+  $("balSlider").value=bal;
+  $("balNote").textContent = bal===0 ? "Centered"
+    : bal<0 ? ("Leaning left "+Math.abs(bal)+"%")
+            : ("Leaning right "+bal+"%");
+  $("balBtn").style.color = bal===0 ? "" : "var(--accent)";
+}
+function setBalance(bal,persist=true){
+  bal=Math.max(-100,Math.min(100,Math.round(bal)));
+  applyBalance(bal);
+  if(persist) saveBalance(bal);
+}
+// initialize from storage and apply immediately (engine applies it whenever the ctx exists)
+(function initBalance(){ setBalance(loadBalance(),false); })();
+$("balSlider").oninput=e=>setBalance(+e.target.value);
+$("balReset").onclick=()=>setBalance(0);
+// open/close the popover
+function toggleBalMenu(open){
+  const m=$("balMenu"); const show = open!=null ? open : !m.classList.contains("show");
+  m.classList.toggle("show",show);
+  $("balBtn").setAttribute("aria-expanded", show?"true":"false");
+}
+$("balBtn").onclick=e=>{ e.stopPropagation(); engine._ensureCtx(); toggleBalMenu(); };
+// click outside closes it
+document.addEventListener("click",e=>{
+  const m=$("balMenu"); if(!m.classList.contains("show")) return;
+  if(!m.contains(e.target) && e.target!==$("balBtn")) toggleBalMenu(false);
+});
+$("balMenu").onclick=e=>e.stopPropagation();
+
+$("fadeBtn").onclick=()=>{
+  // The setter forwards setFadeOut30s to native, which applies it live on the next render
+  // (contract §4.9) — no schedule reload needed.
+  engine.fadeOut30s = !engine.fadeOut30s;
+  $("fadeBtn").classList.toggle("primary", engine.fadeOut30s);
+};
+
+function updateTransportUI(){
+  // UI-only now: the native service owns playback state and the MediaSession/notification
+  // (contract §5.3 — AndroidBridge.playbackStateChanged and AndroidPlayerControl are deleted).
+  $("playBtn").textContent = engine.running ? "⏸ Pause" : "▶ Play";
+}
+$("stopBtn").onclick=()=>{ engine.stopReset(); engine.startOffset=0; engine._played=0; engine._elapsedAccrued=0; engine._elapsedSecMirror=0; graph.setPlay(0); $("seek").value=0; $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(0, sched?sched.totalTime:0, sched?sched.loops:0) + "</strong>"; $("loopHint").innerHTML=loopHintHTML(sched?sched.loops:0); updateTransportUI(); };
+
+engine.onTick=t=>{
+  graph.setPlay(t);
+  const elapsed = engine._elapsedSeconds();
+  const trueTotalElapsed = (engine._played * (sched.totalTime || 0)) + t;
+  
+  if (sched.loops > 0) {
+    const totalPlayback = sched.totalTime * sched.loops;
+    $("seek").value = Math.round((elapsed / (totalPlayback || 1)) * 1000);
+  } else {
+    $("seek").value = Math.round(t / (sched.totalTime || 1) * 1000);
+  }
+  let liveStr = "";
+  const tv=sched.voices.find(v=>isTone(v.type)&&!v.muted);
+  if(tv){ const s=sampleVoice(buildSegments(tv),t);
+    if(s){
+      if(tv.type===0) liveStr = `beat ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz · L ${(s.base-s.beat/2).toFixed(1)} / R ${(s.base+s.beat/2).toFixed(1)} Hz`;
+      else liveStr = `${typeName(tv.type).toLowerCase()} · pulse ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz`;
+    }}
+  else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) liveStr = `${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`; } }
+  
+  $("timeLbl").innerHTML = `<strong style="font-size:1.15em">${fmtElapsed(elapsed, sched.totalTime, sched.loops, trueTotalElapsed)}</strong>` + (liveStr ? `<span style="font-size:0.85em">  ·  ${liveStr}</span>` : "");
+  
+  $("loopHint").innerHTML = loopHintHTML(sched ? sched.loops : 0);
+  
+  if(t>=sched.totalTime && engine.loopsLeft<=1){ updateTransportUI(); }
+};
+// Seek-elapsed semantics: elapsed tracks playhead position.
+$("seek").oninput=e=>{
+  if(!sched) return;
+  const val = +e.target.value / 1000;
+  // Compute the target FULL-TIMELINE elapsed exactly as before, then hand it to native in a single
+  // seekElapsed call. Native owns the cursor and (played, loopsLeft); the mirror is refreshed by the
+  // next onTick, so there is no local juggling here (contract §6). `t` is the within-pass time, used
+  // only for the local live-readout below.
+  let t, targetElapsed;
+  if (sched.loops > 0) {
+    const totalPlayback = sched.totalTime * sched.loops;
+    targetElapsed = val * totalPlayback;
+    t = targetElapsed % sched.totalTime;
+    if (targetElapsed >= totalPlayback) t = sched.totalTime;
+  } else {
+    t = val * sched.totalTime;
+    targetElapsed = t;
+  }
+
+  engine.seekElapsed(targetElapsed);
+  // keep the local cursor mirror in step for the stopped case (native confirms via onTick)
+  engine.startOffset = t;
+  engine._elapsedSecMirror = targetElapsed;
+  updateTransportUI();
+
+  const trueTotalElapsed = targetElapsed;
+  let liveStr = "";
+  const tv=sched.voices.find(v=>isTone(v.type)&&!v.muted);
+  if(tv){ const s=sampleVoice(buildSegments(tv),t);
+    if(s){
+      if(tv.type===0) liveStr = `beat ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz · L ${(s.base-s.beat/2).toFixed(1)} / R ${(s.base+s.beat/2).toFixed(1)} Hz`;
+      else liveStr = `${typeName(tv.type).toLowerCase()} · pulse ${s.beat.toFixed(1)} Hz · base ${s.base.toFixed(0)} Hz`;
+    }}
+  else { const nv=sched.voices.find(v=>!v.muted); if(nv){ const s=sampleVoice(buildSegments(nv),t); if(s) liveStr = `${nv.type===1?"noise":"voice"} · L ${(s.volL*100).toFixed(0)}% / R ${(s.volR*100).toFixed(0)}%`; } }
+  
+  graph.setPlay(t); 
+  $("timeLbl").innerHTML = `<strong style="font-size:1.15em">${fmtElapsed(engine._elapsedSeconds(), sched.totalTime, sched.loops, trueTotalElapsed)}</strong>` + (liveStr ? `<span style="font-size:0.85em">  ·  ${liveStr}</span>` : "");
+  $("loopHint").innerHTML=loopHintHTML(sched?sched.loops:0);
+};
+$("masterVol").oninput=e=>{
+  engine.setMasterVolume(+e.target.value/100);
+  $("volLbl").textContent=e.target.value+"%";
+};
+$("volLbl").onclick=()=>{
+  $("masterVol").value = 100;
+  engine.setMasterVolume(1);
+  $("volLbl").textContent="100%";
+};
+
+/* ---- Repeat / loop control (0 = infinite) ---- */
+// Friendly total-duration format: "45s", "6:00", "12:00", "1h 30m" for long totals.
+function fmtTotal(sec){
+  sec=Math.max(0,Math.round(sec));
+  if(sec<60) return sec+"s";
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if(h>0) return h+"h"+(m?" "+m+"m":"");
+  return m+":"+String(s).padStart(2,"0");
+}
+function fmtElapsed(sec, total, loops, totalPlayed){
+  const elapsed = fmt(sec);
+  if(loops === 0 || !isFinite(loops)) {
+     if (totalPlayed !== undefined && totalPlayed > 0 ) {
+         return elapsed + " / ∞ (" + fmt(totalPlayed) + ")";
+     }
+     return elapsed + " / ∞";
+  }
+  return elapsed + " / " + fmt(total * loops);
+}
+// The hint shows the ACTUAL play time (schedule duration × repeats), not the loop count.
+function loopHintHTML(n){
+  const dur=sched?sched.totalTime:0;
+  
+  let loopStr = "";
+  if (engine && engine.running) {
+    const cur = (engine._played || 0) + 1;
+    if (n === 0) loopStr = `loop ${cur}/∞`;
+    else if (n > 1) loopStr = `loop ${Math.min(cur, n)}/${n}`;
+  }
+  
+  if(n===0) return `<span class="lhBig">plays forever</span><span class="lhCap">${loopStr || 'loops until you stop'}</span>`;
+  const total=fmtTotal(dur*n);
+  const times = n===1 ? "1× · "+fmtTotal(dur) : `${n}× · ${fmtTotal(dur)} each`;
+  return `<span class="lhBig">${total} total</span><span class="lhCap">${loopStr || times}</span>`;
+}
+function syncLoopUI(){
+  const inp=$("loopInput"); const n=sched?sched.loops:0;
+  // show ∞ when 0 so the meaning is obvious at a glance; the field is still a number input,
+  // so when focused/typing the user works with real digits.
+  if(document.activeElement!==inp){ inp.value = n===0 ? "" : String(n); }
+  inp.placeholder="∞"; inp.classList.toggle("inf", n===0);
+  $("loopHint").innerHTML = loopHintHTML(n);
+}
+function setLoopCount(n){
+  if(!sched) return;
+  pushUndo();
+  n=Math.max(0, Math.floor(n)||0);
+  engine.setLoops(n);          // updates sched.loops + live countdown
+  syncLoopUI();
+}
+{
+  let timer, isLong = false;
+  const btn = $("loopMinus");
+  btn.onpointerdown = () => {
+    clearTimeout(timer);
+    isLong = false;
+    timer = setTimeout(() => { if (sched) { setLoopCount(0); isLong = true; } }, 600);
+  };
+  btn.onpointerup = btn.onpointerleave = btn.onpointercancel = () => clearTimeout(timer);
+  btn.onclick = () => {
+    if (isLong) { isLong = false; return; }
+    if (!sched) return;
+    setLoopCount((sched.loops || 0) - 1);
+  };
+}
+$("loopPlus").onclick = () => { if (!sched) return; setLoopCount((sched.loops || 0) + 1); };
+$("loopInput").oninput=e=>{ if(!sched) return; const v=e.target.value.trim(); setLoopCountKeepFocus(v===""?0:parseInt(v,10)); };
+$("loopInput").onblur =()=>syncLoopUI();
+// when typing we must not overwrite the field the user is editing, so update state+hint only
+function setLoopCountKeepFocus(n){
+  if(!sched) return;
+  pushUndo();
+  n=Math.max(0, Math.floor(n)||0);
+  engine.setLoops(n);
+  $("loopInput").classList.toggle("inf", n===0);
+  $("loopHint").innerHTML = loopHintHTML(n);
+}
+$("viewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  $("viewSeg").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); graph.setView(b.dataset.view);
+});
+
+// file loading
+// A schedule may bundle external audio-file (type-2) voices whose WAVs sit next to the .gnaural.
+// The native layer captures every picked *.wav URI at file-pick time and decodes it lazily on
+// loadSchedule (contract §5.5) — JS never touches the WAV bytes. Here we only split the picked
+// files into the schedule (.gnaural/.xml) and the WAVs, then load the schedule; WAV availability
+// is checked via NativeAudio.hasWav (see _lookupBuffer / checkMissingAudio).
+async function ingestFiles(fileList){
+  const files=[...fileList];
+  if(!files.length) return;
+  const isSched=f=>/\.(gnaural|xml)$/i.test(f.name);
+  const isWav  =f=>/\.wav$/i.test(f.name) || /audio\/(x-)?wav/i.test(f.type);
+  const schedFile=files.find(isSched);
+  const wavFiles=files.filter(isWav);
+
+  if(wavFiles.length){
+    // Native already registered these WAV URIs when they were picked; just note it for the user.
+    $("status").textContent=`Loaded ${wavFiles.length} audio file${wavFiles.length>1?"s":""}…`;
+  }
+
+  if(schedFile){
+    load(await schedFile.text(), schedFile.name);
+  } else if(wavFiles.length){
+    // WAVs dropped but no schedule — keep them for a schedule loaded next, and re-evaluate
+    // the currently loaded schedule (if any) so newly supplied audio plays.
+    if(sched){ checkMissingAudio(); restartIfPlaying(); }
+    else $("status").textContent="Loaded audio files. Now load the matching .gnaural schedule.";
+  }
+}
+// After a schedule loads (or new WAVs arrive), tell the user which type-2 voices still have
+// no audio so the silence is explained rather than mysterious. WAV presence is queried natively
+// via NativeAudio.hasWav (through engine._lookupBuffer).
+function checkMissingAudio(){
+  if(!sched) return [];
+  const missing=sched.voices.filter(v=>v.type===2 && !engine._lookupBuffer(v.desc)).map(v=>v.desc);
+  if(missing.length){
+    const note=`⚠ ${missing.length} audio-file voice${missing.length>1?"s":""} have no WAV loaded (silent): ${missing.slice(0,4).join(", ")}${missing.length>4?"…":""}. Select/drop the .wav files alongside the .gnaural.`;
+    $("status").textContent=note; $("status").classList.add("err");
+  }
+  return missing;
+}
+$("file").onchange=e=>{ ingestFiles(e.target.files); };
+const dz=$("dropZone");
+["dragover","dragenter"].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over");}));
+document.addEventListener("drop",e=>{ if(e.dataTransfer&&e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); });
+
+// "Load schedule" dropdown: read schedules.json (a list of bundled .gnaural paths, e.g.
+// "schedules/foo.gnaural") and offer each as a menu entry. Picking one fetches that file and
+// loads it. These files are precached by the service worker (sw.js ASSETS), so once the PWA is
+// installed they remain available offline. Relative paths keep this working on GitHub Pages.
+// NOTE: fetch is blocked under file:// in most browsers — the menu only populates when served
+// over http(s) (the start-gnauri.bat dev server, or GitHub Pages). Off file://, use 📂 / drag-drop.
+
+// Turn "schedules/baa_wind_and_waves.gnaural" into "Wind And Waves" for the menu label.
+function prettyScheduleName(path){
+  let base = path.split("/").pop().replace(/\.gnaural$/i,"");
+  base = base.replace(/^[a-z]{2,3}_/i,"");      // strip ordering prefix like "baa_", "zaa_"
+  base = base.replace(/[_-]+/g," ").trim();
+  return base.replace(/\b\w/g, c=>c.toUpperCase()) || path;
+}
+const scheduleSelect=$("scheduleSelect");
+// Which bundled schedule loads automatically on startup. Matched case-insensitively against
+// the path, so it survives the schedules/ prefix and the ordering prefix (baa_).
+const DEFAULT_SCHEDULE_MATCH=/wind_and_waves\.gnaural$/i;
+async function loadScheduleFromPath(val){
+  $("status").textContent="Loading "+prettyScheduleName(val)+"…";
+  try{
+    const f=await fetch(val,{cache:"no-store"});
+    if(!f.ok) throw new Error("could not fetch "+val);
+    load(await f.text(), val.split("/").pop());
+  }catch(e){
+    $("status").textContent="Couldn't load ("+e.message+") — try 📂 to pick a file.";
+    $("status").classList.add("err");
+  }
+}
+async function populateScheduleMenu(){
+  try{
+    const res=await fetch("schedules.json",{cache:"no-store"});
+    if(!res.ok) throw new Error("no schedules.json");
+    let list=await res.json();
+    list=(Array.isArray(list)?list:[]).filter(x=>/\.gnaural$/i.test(x)).sort((a,b)=>a.localeCompare(b));
+    if(!list.length) throw new Error("schedules.json is empty");
+    for(const path of list){
+      const opt=document.createElement("option");
+      opt.value=path; opt.textContent=prettyScheduleName(path);
+      scheduleSelect.appendChild(opt);
+    }
+    // Auto-load the default schedule on startup (only if the user hasn't already loaded
+    // something — e.g. via 📂 or drag-drop before the menu finished fetching).
+    if(!sched){
+      const def=list.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
+      if(def) await loadScheduleFromPath(def);
+    }
+  }catch(e){
+    console.warn("Could not fetch schedules.json, using hardcoded fallback list", e);
+    const fallbackList = [
+      "schedules/baa_wind_and_waves.gnaural",
+      "schedules/caa_spring_rain.gnaural",
+      "schedules/daa_energize.gnaural",
+      "schedules/eaa_power_nap.gnaural",
+      "schedules/faa_problem_resolver.gnaural",
+      "schedules/gaa_dream.gnaural",
+      "schedules/haa_wakeup.gnaural",
+      "schedules/iaa_tibetan_bowls.gnaural",
+      "schedules/jaa_travel_aid.gnaural",
+      "schedules/kaa_study_time.gnaural",
+      "schedules/laa_rain_shower.gnaural",
+      "schedules/maa_babbling_brook.gnaural",
+      "schedules/naa_instant_nap.gnaural",
+      "schedules/zaa_default_schedule.gnaural"
+    ];
+    for(const path of fallbackList){
+      const opt=document.createElement("option");
+      opt.value=path; opt.textContent=prettyScheduleName(path);
+      scheduleSelect.appendChild(opt);
+    }
+    const optSample=document.createElement("option");
+    optSample.value="__SAMPLE__"; optSample.textContent="✨ Built-in sample";
+    scheduleSelect.appendChild(optSample);
+    
+    if(!sched){
+      const def=fallbackList.find(p=>DEFAULT_SCHEDULE_MATCH.test(p));
+      if(def) await loadScheduleFromPath(def);
+    }
+  }
+}
+scheduleSelect.onchange=async ()=>{
+  const val=scheduleSelect.value;
+  if(!val) return;
+  if(val==="__SAMPLE__"){ load(SAMPLE,"sample.gnaural"); scheduleSelect.selectedIndex=0; return; }
+  await loadScheduleFromPath(val);
+  scheduleSelect.selectedIndex=0;   // reset to the "Load schedule…" prompt for the next pick
+};
+populateScheduleMenu();
+const SAMPLE=`<?xml version="1.0"?>
+<gnauralfile version="1.20">
+ <product_title>Sample: Alpha to Theta Descent</product_title>
+ <product_author>Gnauri</product_author>
+ <product_description>10-minute relaxation ramp from 10 Hz alpha down to 5 Hz theta, on a 200 Hz carrier, with a soft pink-noise bed.</product_description>
+ <voices>
+  <voice id="0" type="0" description="binaural tone" mute="0" view="1">
+   <datapoints>
+    <datapoint duration="60"  beatfreq="10" basefreq="200" volume_left="0.8" volume_right="0.8"/>
+    <datapoint duration="240" beatfreq="8"  basefreq="200" volume_left="0.8" volume_right="0.8"/>
+    <datapoint duration="240" beatfreq="6"  basefreq="190" volume_left="0.8" volume_right="0.8"/>
+    <datapoint duration="60"  beatfreq="5"  basefreq="180" volume_left="0.8" volume_right="0.8"/>
+   </datapoints>
+  </voice>
+  <voice id="1" type="1" description="pink noise" mute="0" view="1">
+   <datapoints>
+    <datapoint duration="300" beatfreq="0" basefreq="0" volume_left="0.25" volume_right="0.25"/>
+    <datapoint duration="300" beatfreq="0" basefreq="0" volume_left="0.15" volume_right="0.15"/>
+   </datapoints>
+  </voice>
+ </voices>
+</gnauralfile>`;
+
+/* ============================ Edit-point dialog ============================
+   Tapping the timeline pins a point; the pinned tooltip offers an "Edit point" button for the
+   nearest editable (binaural/isochronic) voice. The button calls graph.onEditRequest, which opens
+   this modal pre-filled with the SAVED datapoint's stored values (NOT the interpolated readout).
+   Apply writes beat/base/volL/volR back into voice.points[i], rebuilds the engine's segment cache
+   for that voice, redraws, and restarts playback if running (same live-apply pattern as mute/solo).
+   Only beat/base/volL/volR are touched — duration and state are preserved. */
+const editState={ vi:null, pi:null };
+function clamp(n,lo,hi){ n=parseFloat(n); if(!isFinite(n)) n=lo; return Math.max(lo,Math.min(hi,n)); }
+function openEditDialog(vi, _time){
+  if(!sched) return;
+  const v=sched.voices[vi]; if(!v) return;
+  const segs=buildSegments(v);
+  // resolve the saved point index from the (snapped) time
+  let pi=0,pd=Infinity; for(let i=0;i<segs.length;i++){ const d=Math.abs(segs[i].t0-_time); if(d<pd){pd=d;pi=i;} }
+  const p=v.points[pi]; if(!p) return;
+  editState.vi=vi; editState.pi=pi;
+  const isBinaural=v.type===0;
+  const tone=isTone(v.type);     // 0/3/4: beat+carrier+volume. Others: volume only.
+  // Tone-like voices show beat + carrier fields; other types (noise, audio file, …) hide them and
+  // expose volume only.
+  $("edBeatFld").style.display = tone ? "" : "none";
+  $("edBaseFld").style.display = tone ? "" : "none";
+  // labels: binaural says "Beat", isochronic says "Pulse rate"; carrier label shared
+  $("edBeatLbl").textContent = isBinaural ? "Beat (Hz)" : "Pulse rate (Hz)";
+  $("edBaseLbl").textContent = "Carrier (Hz)";
+  $("edSwatch").style.background=voiceColor(v.index);
+  $("edTitle").textContent=(v.desc||("Voice "+v.index));
+  $("edWhen").textContent="point #"+pi+" · "+fmt(segs[pi]?segs[pi].t0:0);
+  // beat
+  $("edBeat").value = (+p.beat).toFixed(2).replace(/\.00$/,"");
+  $("edBeatRange").value = clamp(p.beat,0,40);
+  // base
+  $("edBase").value = Math.round(p.base);
+  $("edBaseRange").value = clamp(p.base,20,1000);
+  // volume (stored 0..1 -> shown 0..100)
+  const vl=Math.round((p.volL||0)*100), vr=Math.round((p.volR||0)*100);
+  const linked = vl===vr;
+  $("edVolLink").checked=linked;
+  $("edVol").value=vl; $("edVolRange").value=vl;
+  $("edVolL").value=vl; $("edVolLRange").value=vl;
+  $("edVolR").value=vr; $("edVolRRange").value=vr;
+  applyVolLinkUI();
+  $("edNote").textContent = !tone
+    ? "This voice type supports volume only."
+    : isBinaural
+      ? "Carrier ± beat/2 is sent to each ear."
+      : "Pulse rate gates the carrier amplitude.";
+  $("editBack").classList.add("show");
+}
+function closeEditDialog(){ $("editBack").classList.remove("show"); editState.vi=null; editState.pi=null; }
+function applyVolLinkUI(){
+  const linked=$("edVolLink").checked;
+  $("edVolSingle").classList.toggle("hide",!linked);
+  $("edVolSplit").classList.toggle("show",!linked);
+}
+// keep number<->range pairs in sync
+function pair(numId,rangeId){
+  const n=$(numId), r=$(rangeId);
+  n.oninput=()=>{ r.value=n.value; };
+  r.oninput=()=>{ n.value=r.value; };
+}
+pair("edBeat","edBeatRange"); pair("edBase","edBaseRange");
+pair("edVol","edVolRange"); pair("edVolL","edVolLRange"); pair("edVolR","edVolRRange");
+$("edVolLink").onchange=()=>{
+  if($("edVolLink").checked){ // collapsing to single: seed single from L
+    $("edVol").value=$("edVolL").value; $("edVolRange").value=$("edVolL").value;
+  } else { // expanding: seed both from single
+    $("edVolL").value=$("edVol").value; $("edVolLRange").value=$("edVol").value;
+    $("edVolR").value=$("edVol").value; $("edVolRRange").value=$("edVol").value;
+  }
+  applyVolLinkUI();
+};
+$("edCancel").onclick=closeEditDialog;
+$("editBack").onclick=e=>{ if(e.target===$("editBack")) closeEditDialog(); };
+$("edApply").onclick=()=>{
+  pushUndo();
+  if(editState.vi==null||editState.pi==null) return;
+  const v=sched.voices[editState.vi]; const p=v.points[editState.pi]; if(!p) return;
+  // write only the requested fields; preserve duration & state. Beat/carrier are only written for
+  // tone-like voices — for other types those fields are hidden and must not be touched.
+  if(isTone(v.type)){
+    p.beat = Math.max(0, clamp($("edBeat").value,0,100000));
+    p.base = Math.max(0, clamp($("edBase").value,0,100000));
+  }
+  if($("edVolLink").checked){
+    const vv=clamp($("edVol").value,0,100)/100; p.volL=vv; p.volR=vv;
+  } else {
+    p.volL=clamp($("edVolL").value,0,100)/100;
+    p.volR=clamp($("edVolR").value,0,100)/100;
+  }
+  // rebuild the engine's cached segments for this voice so playback reflects the edit
+  engine.segCache[editState.vi]=buildSegments(v);
+  // recompute graph scales (a higher beat/base may exceed current axis max) and redraw
+  graph.recomputeScales();
+  graph.draw();
+  restartIfPlaying();
+  closeEditDialog();
+};
+// the graph asks us to open the editor when its tooltip Edit button is tapped
+graph.onEditRequest=(vi,time)=>openEditDialog(vi,time);
+function closeScaleTimeDialog() {
+  $("scaleTimeDlg").classList.remove("show");
+}
+$("scaleTimeCancel").onclick = closeScaleTimeDialog;
+$("scaleTimeDlg").onclick = e => { if (e.target === $("scaleTimeDlg")) closeScaleTimeDialog(); };
+
+$("scaleTimeBtn").onclick = () => {
+  if (!sched || !sched.totalTime) return;
+  $("scaleTimeCurrent").textContent = "Current: " + fmt(sched.totalTime) + " (" + sched.totalTime.toFixed(1) + "s)";
+  $("scaleTimeInput").value = sched.totalTime.toFixed(1);
+  $("scaleTimeDlg").classList.add("show");
+};
+
+$("scaleTimeApply").onclick = () => {
+  pushUndo();
+  const resp = $("scaleTimeInput").value.trim();
+  if (!resp) return;
+  
+  let newTotal = 0;
+  if (resp.startsWith("*")) {
+    const factor = parseFloat(resp.substring(1));
+    if (isNaN(factor) || factor <= 0) return console.log("Invalid factor");
+    newTotal = sched.totalTime * factor;
+  } else {
+    newTotal = parseFloat(resp);
+    if (isNaN(newTotal) || newTotal <= 0) return console.log("Invalid time");
+  }
+  
+  const factor = newTotal / sched.totalTime;
+  sched.voices.forEach(v => {
+    v.points.forEach(p => {
+      p.duration *= factor;
+    });
+  });
+  sched.totalTime = newTotal;
+  
+  // Update Engine and UI
+  engine.setSchedule(sched);
+  $("mDur").textContent=fmt(sched.totalTime)+" ("+Math.round(sched.totalTime)+"s)";
+  $("timeLbl").innerHTML = "<strong style='font-size:1.15em'>" + fmtElapsed(engine._played*sched.totalTime, sched.totalTime, sched.loops) + "</strong>";
+  graph.setPlay(engine._played*sched.totalTime); // approximate update
+  closeScaleTimeDialog(); restartIfPlaying();
+};
+
+// Mass Edit feature
+let massEditState = null;
+
+function closeMassEditDialog() {
+  $("massEditDlg").classList.remove("show");
+  const dd = $("massEditVoiceSelectDropdown");
+  if (dd) dd.style.display = "none";
+  massEditState = null;
+  graph.draw();
+}
+$("massEditCancel").onclick = closeMassEditDialog;
+$("massEditDlg").onclick = e => { if (e.target === $("massEditDlg")) closeMassEditDialog(); };
+
+document.addEventListener("click", e => {
+  const selectDropdown = $("massEditVoiceSelectDropdown");
+  const selectBtn = $("massEditVoiceSelectBtn");
+  if (selectDropdown && selectDropdown.style.display === "block") {
+    if (!selectDropdown.contains(e.target) && !selectBtn.contains(e.target)) {
+      selectDropdown.style.display = "none";
+    }
+  }
+});
+
+let currentMassEditMode = 'shift';
+function setMassEditMode(mode) {
+  currentMassEditMode = mode;
+  $("btnModeShift").className = mode === 'shift' ? 'on' : '';
+  $("btnModeRamp").className = mode === 'ramp' ? 'on' : '';
+  $("massEditShiftPane").style.display = mode === 'shift' ? 'block' : 'none';
+  $("massEditRampPane").style.display = mode === 'ramp' ? 'flex' : 'none';
+}
+$("btnModeShift").onclick = () => setMassEditMode('shift');
+$("btnModeRamp").onclick = () => setMassEditMode('ramp');
+setMassEditMode('shift');
+
+function insertPointAtTime(v, tNew) {
+  let time = 0;
+  for (let i = 0; i < v.points.length; i++) {
+    const p = v.points[i];
+    if (tNew > time && tNew < time + p.duration) {
+      const d1 = tNew - time;
+      const d2 = p.duration - d1;
+      const newPoint = JSON.parse(JSON.stringify(p));
+      p.duration = d1;
+      newPoint.duration = d2;
+      v.points.splice(i + 1, 0, newPoint);
+      return i + 1;
+    }
+    time += p.duration;
+  }
+  if (tNew >= time) {
+    const lastP = v.points[v.points.length - 1];
+    const newPoint = JSON.parse(JSON.stringify(lastP));
+    const extraDuration = tNew - time;
+    if (extraDuration > 0) {
+      newPoint.duration = 0;
+      lastP.duration += extraDuration;
+    } else {
+      newPoint.duration = 0;
+    }
+    v.points.push(newPoint);
+    return v.points.length - 1;
+  }
+  return -1;
+}
+
+function openMassEdit(hitsByVoice, initialVoiceIndex, view, t1, t2, isWholeVoice = false, minVal = null, maxVal = null) {
+  const selectBtn = $("massEditVoiceSelectBtn");
+  const selectDropdown = $("massEditVoiceSelectDropdown");
+  const selectLabel = $("massEditVoiceSelectLabel");
+  
+  selectDropdown.innerHTML = "";
+  selectDropdown.style.display = "none";
+
+  selectBtn.onclick = (e) => {
+    e.stopPropagation();
+    const isShown = selectDropdown.style.display === "block";
+    selectDropdown.style.display = isShown ? "none" : "block";
+  };
+
+  const getHitsForVoice = (vi) => {
+    const viNum = Number(vi);
+    if (hitsByVoice.has(viNum)) {
+      return hitsByVoice.get(viNum);
+    }
+    const v = sched.voices[viNum];
+    if (!v) return [];
+    let ptsInRect = [];
+    let time = 0;
+    if (isWholeVoice) {
+      for (let i = 0; i < v.points.length; i++) {
+        const p = v.points[i];
+        let pv = 0;
+        if (view === "beat") pv = p.beat;
+        else if (view === "base") pv = p.base;
+        else if (view === "volume") pv = p.volL;
+        ptsInRect.push({ index: i, time: time, origVal: pv });
+        time += p.duration;
+      }
+    } else {
+      if (minVal != null && maxVal != null) {
+        const axisMax = view === "beat" ? graph.maxBeat : view === "base" ? graph.maxBase : 1;
+        for (let i = 0; i < v.points.length; i++) {
+          const p = v.points[i];
+          if (time >= t1 && time <= t2) {
+            let pv = 0;
+            let inside = false;
+            if (view === "beat") {
+              pv = p.beat;
+              inside = (pv >= minVal - (axisMax * 0.08) && pv <= maxVal + (axisMax * 0.08));
+            } else if (view === "base") {
+              pv = p.base;
+              inside = (pv >= minVal - (axisMax * 0.08) && pv <= maxVal + (axisMax * 0.08));
+            } else if (view === "volume") {
+              const pvL = p.volL;
+              const pvR = p.volR;
+              const insideL = (pvL >= minVal - (axisMax * 0.08) && pvL <= maxVal + (axisMax * 0.08));
+              const insideR = (pvR >= minVal - (axisMax * 0.08) && pvR <= maxVal + (axisMax * 0.08));
+              if (insideL || insideR) {
+                inside = true;
+                pv = insideL ? pvL : pvR;
+              }
+            }
+            if (inside) {
+              ptsInRect.push({ index: i, time: time, origVal: pv });
+            }
+          }
+          time += p.duration;
+        }
+      }
+    }
+    hitsByVoice.set(viNum, ptsInRect);
+    return ptsInRect;
+  };
+
+  const validVoiceIndices = Array.from(hitsByVoice.keys()).sort((a, b) => a - b);
+
+  let bestVoice = -1;
+  const initViNum = Number(initialVoiceIndex);
+  if (initViNum !== -1 && validVoiceIndices.includes(initViNum)) {
+    bestVoice = initViNum;
+  }
+  if (bestVoice === -1 && validVoiceIndices.length > 0) {
+    let maxHits = -1;
+    validVoiceIndices.forEach((vi) => {
+      const hits = getHitsForVoice(vi);
+      if (hits.length > maxHits) {
+        maxHits = hits.length;
+        bestVoice = vi;
+      }
+    });
+  }
+  if (bestVoice === -1 && validVoiceIndices.length > 0) {
+    bestVoice = validVoiceIndices[0];
+  }
+  if (bestVoice === -1) return;
+
+  let currentSelectedVoice = bestVoice;
+
+  const updateUIForVoice = (vi) => {
+    let viewName = view;
+    if (view === "beat" && sched.voices.some(v => v.type !== 0)) viewName = "beat/pulse";
+    
+    let totalHits = 0;
+    let selectedHits = [];
+    let prefix = isWholeVoice ? "Selected ALL" : "Selected";
+    
+    if (vi === "all") {
+      for (const [vIdx, hits] of hitsByVoice.entries()) {
+        totalHits += hits.length;
+        if (selectedHits.length === 0 && hits.length > 0) {
+          selectedHits = hits;
+        }
+      }
+      $("massEditStats").textContent = `${prefix} ${totalHits} points across ${hitsByVoice.size} voices in ${viewName} view.`;
+    } else {
+      const vIndex = parseInt(vi);
+      selectedHits = getHitsForVoice(vIndex);
+      totalHits = selectedHits.length;
+      const v = sched.voices[vIndex];
+      if (!v) return;
+      const desc = (v.desc && v.desc !== '—') ? ` (${v.desc})` : '';
+      $("massEditStats").textContent = `${prefix} ${totalHits} points of voice ${vIndex+1}${desc} in ${viewName} view.`;
+    }
+    
+    if (selectedHits.length > 0) {
+      $("massEditStart").value = selectedHits[0].origVal.toFixed(view === "volume" ? 2 : 1);
+      $("massEditEnd").value = selectedHits[selectedHits.length-1].origVal.toFixed(view === "volume" ? 2 : 1);
+      $("massEditDelta").value = 0;
+    } else {
+      $("massEditStart").value = 0;
+      $("massEditEnd").value = 0;
+      $("massEditDelta").value = 0;
+    }
+    massEditState = { 
+      vi: vi, 
+      hits: selectedHits, 
+      view: view, 
+      t1: t1, 
+      t2: t2, 
+      isWholeVoice: isWholeVoice,
+      allHitsByVoice: hitsByVoice
+    };
+  };
+
+  const renderVoiceDropdown = () => {
+    selectDropdown.innerHTML = "";
+    
+    // Add individual voices
+    validVoiceIndices.forEach((vIndexNum) => {
+      const v = sched.voices[vIndexNum];
+      const optBtn = document.createElement("button");
+      optBtn.type = "button";
+      const isSelected = String(currentSelectedVoice) === String(vIndexNum);
+      optBtn.className = "custom-dropdown-opt" + (isSelected ? " selected" : "");
+      const desc = (v.desc && v.desc !== '—') ? ` (${v.desc})` : '';
+      optBtn.textContent = `Voice ${vIndexNum + 1}${desc}`;
+      optBtn.onclick = (e) => {
+        e.stopPropagation();
+        selectVoice(vIndexNum);
+        selectDropdown.style.display = "none";
+      };
+      selectDropdown.appendChild(optBtn);
+      
+      if (isSelected) {
+        selectLabel.textContent = `Voice ${vIndexNum + 1}${desc}`;
+      }
+    });
+    
+    // Add "All" option if there are multiple voices
+    if (hitsByVoice.size > 1) {
+      const optBtnAll = document.createElement("button");
+      optBtnAll.type = "button";
+      const isSelected = currentSelectedVoice === "all";
+      optBtnAll.className = "custom-dropdown-opt" + (isSelected ? " selected" : "");
+      optBtnAll.textContent = `All ${hitsByVoice.size} selected voices`;
+      optBtnAll.onclick = (e) => {
+        e.stopPropagation();
+        selectVoice("all");
+        selectDropdown.style.display = "none";
+      };
+      selectDropdown.appendChild(optBtnAll);
+      
+      if (isSelected) {
+        selectLabel.textContent = `All ${hitsByVoice.size} selected voices`;
+      }
+    }
+  };
+
+  const selectVoice = (val) => {
+    currentSelectedVoice = val;
+    renderVoiceDropdown();
+    
+    const chosenVi = val === "all" ? "all" : parseInt(val);
+    updateUIForVoice(chosenVi);
+    graph.selVoice = chosenVi === "all" ? null : chosenVi;
+    graph.draw();
+  };
+
+  updateUIForVoice(bestVoice);
+  renderVoiceDropdown();
+  graph.selVoice = bestVoice === "all" ? null : bestVoice;
+  graph.lockT = (t1 != null && t2 != null) ? (t1 + t2) / 2 : null;
+  $("massEditDlg").classList.add("show");
+  setMassEditMode('shift');
+  graph.draw();
+}
+
+graph.onMassEditVoiceRequest = (vi, view) => {
+  if (!sched) return;
+  const hitsByVoice = new Map();
+  sched.voices.forEach(v => {
+    if (!v.visible) return;
+    let ptsInRect = [];
+    let time = 0;
+    for(let i=0; i<v.points.length; i++) {
+      const p = v.points[i];
+      let pv = 0;
+      if (view === "beat") pv = p.beat;
+      else if (view === "base") pv = p.base;
+      else if (view === "volume") pv = p.volL;
+      
+      ptsInRect.push({index: i, time: time, origVal: pv});
+      time += p.duration;
+    }
+    if (ptsInRect.length > 0) {
+      hitsByVoice.set(Number(v.index), ptsInRect);
+    }
+  });
+
+  if (hitsByVoice.size === 0) return;
+  openMassEdit(hitsByVoice, vi, view, 0, sched.totalTime, true);
+};
+
+graph.onMassEditRequest = (t1, t2, y1, y2, view) => {
+  if (!sched) return;
+  const hitsByVoice = new Map();
+  const axisMax = view === "beat" ? graph.maxBeat : view === "base" ? graph.maxBase : 1;
+  const H = graph._h || graph.cv.height;
+  const {t:pt, b} = graph.pad;
+  const gh = H - pt - b;
+  const val1 = (pt + gh - y1) / gh * (axisMax||1);
+  const val2 = (pt + gh - y2) / gh * (axisMax||1);
+  const minVal = Math.min(val1, val2);
+  const maxVal = Math.max(val1, val2);
+  
+  const tPad = (8 / (graph._w || graph.cv.width)) * (sched.totalTime || 1);
+  sched.voices.forEach(v => {
+    if (!v.visible) return;
+    let ptsInRect = [];
+    let time = 0;
+    for(let i=0; i<v.points.length; i++) {
+      const p = v.points[i];
+      if (time >= t1 - tPad && time <= t2 + tPad) {
+        let pv = 0;
+        let inside = false;
+        if (view === "beat") {
+          pv = p.beat;
+          inside = (pv >= minVal - (axisMax * 0.15) && pv <= maxVal + (axisMax * 0.15));
+        } else if (view === "base") {
+          pv = p.base;
+          inside = (pv >= minVal - (axisMax * 0.15) && pv <= maxVal + (axisMax * 0.15));
+        } else if (view === "volume") {
+          const pvL = p.volL;
+          const pvR = p.volR;
+          const insideL = (pvL >= minVal - (axisMax * 0.15) && pvL <= maxVal + (axisMax * 0.15));
+          const insideR = (pvR >= minVal - (axisMax * 0.15) && pvR <= maxVal + (axisMax * 0.15));
+          if (insideL || insideR) {
+            inside = true;
+            pv = insideL ? pvL : pvR;
+          }
+        }
+        if (inside) {
+          ptsInRect.push({index: i, time: time, origVal: pv});
+        }
+      }
+      time += p.duration;
+    }
+    if (ptsInRect.length > 0) {
+      hitsByVoice.set(Number(v.index), ptsInRect);
+    }
+  });
+  if (hitsByVoice.size === 0) return;
+  openMassEdit(hitsByVoice, -1, view, t1, t2, false, minVal, maxVal);
+};
+
+$("massEditApply").onclick = () => {
+  pushUndo();
+  if(!massEditState || !sched) return;
+  const { vi, hits, view, allHitsByVoice } = massEditState;
+  const mode = currentMassEditMode;
+
+  const applyToVoice = (vIndexNum, voiceHits) => {
+    const v = sched.voices[vIndexNum];
+    if (!v) return;
+    
+    if (mode === "shift") {
+      const delta = parseFloat($("massEditDelta").value);
+      if(isNaN(delta)) return;
+      voiceHits.forEach(h => {
+        const p = v.points[h.index];
+        if (view === "beat") p.beat = Math.max(0, p.beat + delta);
+        else if (view === "base") p.base = Math.max(0, p.base + delta);
+        else if (view === "volume") {
+          p.volL = clamp(p.volL + delta, 0, 1);
+          p.volR = clamp(p.volR + delta, 0, 1);
+        }
+      });
+    } else if (mode === "ramp") {
+      const startVal = parseFloat($("massEditStart").value);
+      const endVal = parseFloat($("massEditEnd").value);
+      if(isNaN(startVal) || isNaN(endVal)) return;
+      
+      if (voiceHits.length === 0) {
+        // do nothing
+      } else if (voiceHits.length === 1) {
+        const p0 = v.points[voiceHits[0].index];
+        const tStart = voiceHits[0].time;
+        let tEnd = massEditState.t2;
+        if (tEnd == null || tEnd <= tStart) {
+          tEnd = tStart + p0.duration;
+        }
+        if (tEnd <= tStart) {
+          tEnd = tStart + 60;
+        }
+        const newIdx = insertPointAtTime(v, tEnd);
+        if (newIdx !== -1) {
+          const pStart = v.points[voiceHits[0].index];
+          const pEnd = v.points[newIdx];
+          if (view === "beat") {
+            pStart.beat = Math.max(0, startVal);
+            pEnd.beat = Math.max(0, endVal);
+          } else if (view === "base") {
+            pStart.base = Math.max(0, startVal);
+            pEnd.base = Math.max(0, endVal);
+          } else if (view === "volume") {
+            pStart.volL = clamp(startVal, 0, 1);
+            pStart.volR = clamp(startVal, 0, 1);
+            pEnd.volL = clamp(endVal, 0, 1);
+            pEnd.volR = clamp(endVal, 0, 1);
+          }
+        }
+      } else {
+        const tStart = voiceHits[0].time;
+        const tEnd = voiceHits[voiceHits.length-1].time;
+        const tSpan = tEnd - tStart;
+        voiceHits.forEach(h => {
+          const p = v.points[h.index];
+          const progress = tSpan > 0 ? (h.time - tStart) / tSpan : 0;
+          const newVal = startVal + (endVal - startVal) * progress;
+          if (view === "beat") p.beat = Math.max(0, newVal);
+          else if (view === "base") p.base = Math.max(0, newVal);
+          else if (view === "volume") {
+            p.volL = clamp(newVal, 0, 1);
+            p.volR = clamp(newVal, 0, 1);
+          }
+        });
+      }
+    }
+  };
+
+  if (vi === "all") {
+    for (const [vIndexNum, voiceHits] of allHitsByVoice.entries()) {
+      applyToVoice(vIndexNum, voiceHits);
+    }
+  } else {
+    applyToVoice(vi, hits);
+  }
+
+  graph.recomputeScales();
+  engine.setSchedule(sched); restartIfPlaying();
+  closeMassEditDialog();
+};
+
+/* ============================ Export to .gnaural ============================
+   Serialize the (possibly edited) in-memory schedule to canonical Gnaural 1.20 XML and download it.
+   NOTE: the parser is lossy by design (it normalizes volumes to 0..1, derives totalTime, and drops
+   attributes/flags it never read), so this writes a NORMALIZED file — faithful for beat/base/volume/
+   duration/type/mute, but exotic original fields are not preserved. Volumes are written in Gnaural's
+   native 0..1 range. Offline, no deps: build the string, Blob it, click a temporary <a download>. */
+function xmlEscape(s){ return String(s==null?"":s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function gnauralTypeAttr(v){ return v.type; } // types map 1:1 to Gnaural ids (0,1,2,3,4,5,6,...)
+function buildGnauralXML(s){
+  const total=Math.round(s.totalTime||0);
+  let out="";
+  out+=`<?xml version="1.0" encoding="UTF-8"?>\n`;
+  out+=`<gnauralfile version="1.20">\n`;
+  out+=` <product_title>${xmlEscape(s.title)}</product_title>\n`;
+  out+=` <product_author>${xmlEscape(s.author)}</product_author>\n`;
+  out+=` <product_description>${xmlEscape(s.desc)}</product_description>\n`;
+  out+=` <schedule_totaltime>${total}</schedule_totaltime>\n`;
+  out+=` <overallvolume_left>${(s.ovL!=null?s.ovL:1)}</overallvolume_left>\n`;
+  out+=` <overallvolume_right>${(s.ovR!=null?s.ovR:1)}</overallvolume_right>\n`;
+  out+=` <loops>${Math.max(0,s.loops|0)}</loops>\n`;
+  out+=` <stereoswap>${s.stereoswap?1:0}</stereoswap>\n`;
+  out+=` <voices>\n`;
+  for(const v of s.voices){
+    out+=`  <voice id="${v.index}" type="${gnauralTypeAttr(v)}" description="${xmlEscape(v.desc)}" voice_mute="${v.muted?1:0}" voice_hide="${v.visible?0:1}" voice_mono="${v.mono?1:0}">\n`;
+    if(v.file) out+=`   <voice_file>${xmlEscape(v.file)}</voice_file>\n`;
+    out+=`   <datapoints>\n`;
+    for(const p of v.points){
+      const round=(x,d)=>{ const f=Math.pow(10,d); return Math.round((x||0)*f)/f; };
+      out+=`    <datapoint duration="${round(p.duration,3)}" beatfreq="${round(p.beat,4)}" basefreq="${round(p.base,4)}" volume_left="${round(p.volL,4)}" volume_right="${round(p.volR,4)}" state="${p.state!=null?p.state:1}"/>\n`;
+    }
+    out+=`   </datapoints>\n`;
+    out+=`  </voice>\n`;
+  }
+  out+=` </voices>\n`;
+  out+=`</gnauralfile>\n`;
+  return out;
+}
+function exportGnaural(){
+  if(!sched){ return; }
+  const xml=buildGnauralXML(sched);
+  const safe=(sched.title||"schedule").replace(/[^\w.-]+/g,"_").replace(/^_+|_+$/g,"")||"schedule";
+  if (window.AndroidBridge) {
+    window.AndroidBridge.exportFile(xml, safe + ".gnaural");
+    return;
+  }
+  const blob=new Blob([xml],{type:"application/xml"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=safe+".gnaural";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function updateM4aProgressUI(progress) {
+  const status = $("status");
+  const m4aBtn = $("exportM4aBtn");
+  const saveBtn = $("exportBtn");
+  if (progress === null) {
+    status.textContent = "Loaded: " + (currentFileName || sched.title);
+    status.classList.remove("err");
+    if (m4aBtn) m4aBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
+  } else {
+    const pct = Math.round(progress * 100);
+    status.textContent = `⚡ Rendering M4A audio: ${pct}%...`;
+    status.classList.remove("err");
+    if (m4aBtn) m4aBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
+  }
+}
+function closeRenderM4aDialog() {
+  $("renderM4aDlg").classList.remove("show");
+}
+$("renderM4aCancel").onclick = closeRenderM4aDialog;
+$("renderM4aDlg").onclick = e => { if (e.target === $("renderM4aDlg")) closeRenderM4aDialog(); };
+
+function exportM4a() {
+  if (!sched) return;
+  if (!window.NativeAudio || typeof window.NativeAudio.renderM4a !== "function") {
+    alert("Audio rendering is only supported inside the Gnauri Android app.");
+    return;
+  }
+  const loopsCount = sched.loops > 0 ? sched.loops : 1;
+  const defaultDurationMins = (sched.totalTime * loopsCount) / 60.0;
+  
+  $("renderM4aCurrent").textContent = "Current single loop: " + fmt(sched.totalTime) + " (" + sched.totalTime.toFixed(1) + "s)";
+  $("renderM4aInput").value = defaultDurationMins.toFixed(2).replace(/\.00$/, "").replace(/\.0$/, "");
+  $("renderM4aLoopHint").textContent = ((sched.totalTime) / 60.0).toFixed(2).replace(/\.00$/, "").replace(/\.0$/, "");
+  
+  $("renderM4aDlg").classList.add("show");
+}
+
+$("renderM4aApply").onclick = () => {
+  const mins = parseFloat($("renderM4aInput").value);
+  if (isNaN(mins) || mins <= 0) {
+    alert("Please enter a valid positive duration in minutes.");
+    return;
+  }
+  const durationSec = mins * 60.0;
+  closeRenderM4aDialog();
+
+  const baseName = currentFileName ? currentFileName.replace(/\.(gnaural|xml)$/i, "") : (sched.title || "schedule");
+  const m4aFilename = baseName + ".m4a";
+  const safeM4aFilename = m4aFilename.replace(/[^\w.-]+/g,"_").replace(/^_+|_+$/g,"") || "schedule.m4a";
+
+  updateM4aProgressUI(0.0);
+  window.NativeAudio.renderM4a(
+    JSON.stringify(sched),
+    durationSec,
+    engine._uiVol,
+    engine._chL,
+    engine._chR,
+    !!engine.fadeOut30s,
+    safeM4aFilename
+  );
+};
+$("exportBtn").onclick=exportGnaural;
+$("exportM4aBtn").onclick=exportM4a;
+
+// stamp build version into the footer
+$("ver").textContent=APP_VERSION;
+
+// service worker
+if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
+</script>
+</body>
+</html>

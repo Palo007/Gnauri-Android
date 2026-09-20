@@ -1,0 +1,24 @@
+# AI Agent Rules for Gnauri Project
+
+This file contains instructions and rules for AI agents (like Claude or Gemini) working on this project. Agents should read this file at the start of every session.
+
+## Versioning & Releases
+
+- **Mandatory Version Bump**: Every time a new feature is implemented, a bug is fixed, or any functional change is made to the application, the version MUST be increased.
+- **Android Versioning**:
+    - Increment `versionCode` (integer) by 1 in `app/build.gradle.kts`.
+    - Update `versionName` (string) in `app/build.gradle.kts` (e.g., v2.2 -> v2.3).
+- **Web UI Versioning**:
+    - Update the `const APP_VERSION` string in `app/src/main/assets/index.html` to match the new `versionName`.
+- **Documentation**:
+    - Update `README.md` or relevant documentation to reflect new features or changes.
+    - If a feature has a specific shortcut (like a long-press), ensure it's documented in the README under "Pro-tips".
+
+## UI & Assets
+
+- **WebView Interaction**: The core UI is a WebView. Changes to logic often involve `app/src/main/assets/index.html`.
+- **Event Handling**: Prefer `PointerEvents` (e.g., `onpointerdown`) over specific `mousedown`/`touchstart` events to ensure cross-platform compatibility within the Android WebView.
+
+## Architecture
+
+- **Native Bridge**: Be aware of the `AndroidBridge` and `NativeAudio` interfaces for communication between JavaScript and Kotlin.

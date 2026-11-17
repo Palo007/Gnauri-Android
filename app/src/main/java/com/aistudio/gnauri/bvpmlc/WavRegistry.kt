@@ -138,6 +138,9 @@ object WavRegistry {
         } catch (e: Exception) {
             Log.w(TAG, "decode($name) failed: ${e.message}")
             null
+        } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "decode($name) out of memory: ${e.message}")
+            null
         }
         if (result != null) synchronized(lock) { decoded[cacheKey] = result }
         return result
@@ -309,7 +312,8 @@ object WavRegistry {
             codec.start()
 
             val info = MediaCodec.BufferInfo()
-            val out = ArrayList<Float>(srcRate * 4)
+            var out = FloatArray(srcRate.coerceAtLeast(1) * 4)
+            var outCount = 0
             var sawInputEos = false
             var sawOutputEos = false
             val timeoutUs = 10_000L
@@ -341,7 +345,8 @@ object WavRegistry {
                         var s = 0
                         while (s < totalSamples) {
                             // keep channel 0 only
-                            out.add(sb.get(s) / 32768.0f)
+                            if (outCount == out.size) out = out.copyOf(out.size * 2)
+                            out[outCount++] = sb.get(s) / 32768.0f
                             s += channels
                         }
                     }
@@ -352,8 +357,8 @@ object WavRegistry {
                 }
             }
 
-            if (out.isEmpty()) return null
-            val ch0 = FloatArray(out.size) { out[it] }
+            if (outCount == 0) return null
+            val ch0 = out.copyOf(outCount)
             return resampleLinear(ch0, srcRate, targetRate)
         } catch (e: Exception) {
             Log.w(TAG, "decodeViaCodec failed: ${e.message}")

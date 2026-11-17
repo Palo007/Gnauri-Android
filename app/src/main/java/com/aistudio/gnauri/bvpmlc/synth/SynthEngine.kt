@@ -323,6 +323,16 @@ class SynthEngine(val sampleRate: Int) {
     }
 
     private fun beginStopFade(action: Int) {
+        if (stopFadePos >= 0.0) {
+            // Fade already running: do NOT restart it (gain would snap back to 1.0 = click).
+            // Priority: pause/stop > hot-apply > seek. A pending pause/stop is never replaced; a
+            // pending hot-apply is not downgraded to a seek (its pendingSeekElapsed is reused).
+            val cur = stopFadeAction
+            val keep = cur == ACTION_PAUSE || cur == ACTION_STOPRESET ||
+                (cur == ACTION_HOTAPPLY && action == ACTION_SEEK)
+            if (!keep) stopFadeAction = action
+            return
+        }
         stopFadePos = 0.0
         stopFadeAction = action
     }
@@ -338,12 +348,17 @@ class SynthEngine(val sampleRate: Int) {
             ACTION_PAUSE -> {
                 playing = false // keep cursor & played (contract §3)
                 active = null
+                // a hot-apply issued during the pause fade must not be lost (stopped ⇒ replace)
+                pendingSchedule?.let { installSchedule(it); cursor = clampCursor(cursor) }
+                pendingSchedule = null
             }
             ACTION_STOPRESET -> {
                 playing = false
                 cursor = 0.0
                 played = 0
                 active = null
+                pendingSchedule?.let { installSchedule(it); cursor = clampCursor(cursor) }
+                pendingSchedule = null
             }
             ACTION_SEEK -> {
                 // resume playing at the new position with a fresh instance (pool reused)

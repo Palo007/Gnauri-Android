@@ -125,7 +125,7 @@ object M4aRenderer {
 
                                 // Apply manual studio-grade linear fadeout to the last 30 seconds of the requested duration
                                 if (fadeOut30s) {
-                                    val fadeSamples = 30L * sampleRate
+                                    val fadeSamples = min(30L * sampleRate, totalSamplesNeeded)
                                     val fadeStartSample = totalSamplesNeeded - fadeSamples
                                     for (f in 0 until renderFrames) {
                                         val sampleIdx = samplesRendered + f
@@ -220,6 +220,9 @@ object M4aRenderer {
             } catch (e: Exception) {
                 Log.e(TAG, "M4A rendering failed", e)
                 NativeAudioEvents.pushRenderProgress(0.0, true, e.message ?: "Unknown encoding error")
+            } catch (e: OutOfMemoryError) {
+                Log.e(TAG, "M4A rendering ran out of memory", e)
+                NativeAudioEvents.pushRenderProgress(0.0, true, "Out of memory while rendering")
             } finally {
                 try { codec?.stop() } catch (_: Exception) {}
                 try { codec?.release() } catch (_: Exception) {}

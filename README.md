@@ -86,8 +86,27 @@ Stretching or compressing a schedule to fit your lifestyle is incredibly simple.
 * **Dynamic Stereo Balance**: Tap the Balance indicator to open a dedicated slider popover. Fine-tune your left/right mix (perfect for off-balance headphones) and reset it back to center instantly with a single tap.
 * **Seamless Android Integration**: Gnauri runs via a dedicated system bridge. When running on Android, playback state, current elapsed progress, and total playback duration are communicated directly with the OS, ensuring responsive integration with background sound services and notification controls.
 
+* **True Binaural Output with Dolby Atmos / "Immersive Sound"**: Gnauri plays on the Android low-latency audio path and asks the system not to spatialize its output. Vendor sound effects that cross-mix the left and right channels (for example Dolby Atmos "Immersive sound" on Xiaomi / POCO phones) can no longer turn a binaural beat into an isochronic pulse. To confirm on a device, run `adb logcat -s NativeAudioEngine` and look for `performanceMode=1`.
+
+---
+
+## 📝 Changelog
+
+### v2.4.5
+* **Fixed**: Binaural beats became isochronic when Dolby Atmos "Immersive sound" was enabled (low-latency track + spatialization disabled).
+* **Fixed**: App stayed silent if the notification permission was denied.
+* **Fixed**: A "stop" from the lock screen or a Bluetooth device left the player unresponsive until the app was restarted.
+* **Fixed**: Click on pause; the fade-out tail is now played out before the track stops.
+* **Fixed**: Audio thread did not recover after an audio-server restart or output error; the track is now rebuilt.
+* **Fixed**: Possible crash at start-up when the saved schedule used a large WAV file (the reload now runs off the main thread); saved volume, balance and fade settings are now restored to the engine at cold start.
+* **Fixed**: A seek during a pause fade resumed playback; a drag-seek could click.
+* **Fixed**: M4A exports shorter than 30 seconds started too quiet.
+* **Fixed**: Very long WAV/M4A files could crash the app with an out-of-memory error; they now fail safely.
+
 ---
 
 ## 🛠️ Development
+
+To build a debug APK for sideloading, run `.\build-apk.ps1`. The APK is written to `build-output\`.
 
 AI agents working on this project should refer to the [.aierules](file:///.aierules) file for mandatory release and versioning procedures.

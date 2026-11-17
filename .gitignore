@@ -23,3 +23,6 @@ debug.keystore
 # Binaries and releases
 *.7z
 /releases/
+
+# Local APK build output
+/build-output/

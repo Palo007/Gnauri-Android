@@ -32,9 +32,9 @@ class MainActivity : ComponentActivity() {
   private val requestPermissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { isGranted: Boolean ->
-    if (isGranted) {
-      startMediaService()
-    }
+    // Start the service whatever the result: a foreground media service does not need
+    // POST_NOTIFICATIONS; without it the engine would stay null and the app silent.
+    startMediaService()
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {

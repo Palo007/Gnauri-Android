@@ -61,6 +61,7 @@ class MediaForegroundService : Service() {
     // ---- state mirror maintained from engine callbacks (for notification/MediaSession) ----
     @Volatile private var isPlaying = false
     private var startedForeground = false
+    @Volatile private var destroyed = false
 
     // ---- becoming-noisy receiver, registered only while playing ----
     private var noisyRegistered = false
@@ -108,15 +109,6 @@ class MediaForegroundService : Service() {
         audioEngine = NativeAudioEngine(this)
         engine = audioEngine
 
-        // First-launch schedule race: on API 33+ this service only starts after the
-        // POST_NOTIFICATIONS permission result (MainActivity), but the WebView auto-loads the
-        // default schedule immediately on page load, before the engine existed — that
-        // loadSchedule call fell back to a no-op and the schedule was lost. Replay the last
-        // schedule the WebView sent (if any) now that the engine is available. Safe to call here:
-        // loadSchedule only enqueues onto the engine's command queue / decodes WAVs on this
-        // (calling) thread — it does not require the render thread to be running yet.
-        WebViewManager.lastScheduleJson?.let { audioEngine.loadSchedule(it) }
-
         // Engine callbacks arrive on the render thread; marshal service/UI work to the main thread
         // and push the JS mirror (contract §5.2). NativeAudioEvents does its own main-handler post.
         audioEngine.onState = { playing ->
@@ -134,16 +126,41 @@ class MediaForegroundService : Service() {
             override fun onPause() = audioEngine.pause()
             override fun onStop() {
                 audioEngine.stopReset()
-                mainHandler.post { demoteAndStop() }
+                mainHandler.post { demoteOnly() }
             }
             override fun onSeekTo(pos: Long) = audioEngine.seekElapsed(pos / 1000.0)
         })
         mediaSession?.isActive = true
 
         createNotificationChannel()
+
+        // startForegroundService() mandates startForeground() within ~5 s: promote now, before
+        // the (slow) replay below.
+        updateNotification()
+
+        // First-launch race: the WebView may have sent the schedule/settings before the engine
+        // existed (those calls were no-ops). Replay them now, off the main thread because
+        // loadSchedule decodes WAVs synchronously. Same order as the bridge: settings first,
+        // then the schedule.
+        val engineRef = audioEngine
+        Thread {
+            if (destroyed) return@Thread
+            // Fall back to the persisted session if the bridge hasn't loaded it yet.
+            val saved = if (WebViewManager.lastScheduleJson == null) SessionManager.getSessionData(this) else null
+            val volume = saved?.masterVolume ?: WebViewManager.lastVolume
+            val fade = saved?.fadeOut30s ?: WebViewManager.lastFade
+            val chL = saved?.chL ?: WebViewManager.lastChL
+            val chR = saved?.chR ?: WebViewManager.lastChR
+            val json = WebViewManager.lastScheduleJson ?: saved?.schedule
+            engineRef.setMasterVolume(volume)
+            engineRef.setChannelGains(chL, chR)
+            engineRef.setFadeOut30s(fade)
+            if (json != null && !destroyed) engineRef.loadSchedule(json)
+        }.start()
     }
 
     override fun onDestroy() {
+        destroyed = true
         unregisterNoisy()
         abandonFocus()
         releaseWakeLock()
@@ -211,7 +228,9 @@ class MediaForegroundService : Service() {
         updateNotification()
     }
 
-    private fun demoteAndStop() {
+    // Leave the foreground state but keep the service (and engine) alive so the UI can still
+    // play/seek; a later play() re-promotes via onEngineState -> startForegroundSession.
+    private fun demoteOnly() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
@@ -219,6 +238,10 @@ class MediaForegroundService : Service() {
             stopForeground(true)
         }
         startedForeground = false
+    }
+
+    private fun demoteAndStop() {
+        demoteOnly()
         stopSelf()
     }
 

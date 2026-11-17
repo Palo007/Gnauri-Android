@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import com.aistudio.gnauri.bvpmlc.synth.Schedule
@@ -236,7 +237,7 @@ class NativeAudioEngine(context: Context) {
 
     private fun renderLoop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-        val at = buildTrack()
+        var at = buildTrack()
         track = at
 
         var trackPlaying = false
@@ -255,7 +256,23 @@ class NativeAudioEngine(context: Context) {
                     synth.render(floatBuf, renderFrames)
 
                     val written = at.write(floatBuf, 0, renderFrames * channelCount, AudioTrack.WRITE_BLOCKING)
-                    if (written < 0) Log.e(TAG, "AudioTrack.write error: $written")
+                    if (written < 0) {
+                        // ERROR_DEAD_OBJECT (audio server restart / route change) etc.: rebuild the track.
+                        Log.e(TAG, "AudioTrack.write error: $written; rebuilding track")
+                        try {
+                            try { at.release() } catch (_: Exception) {}
+                            val nt = buildTrack()
+                            at = nt
+                            track = nt
+                            trackPlaying = false // loop calls play() again on the new track
+                            lastUnderrun = 0
+                        } catch (e: Exception) {
+                            Log.e(TAG, "track rebuild failed", e)
+                        }
+                        // back off so a repeated failure cannot spin the URGENT_AUDIO thread
+                        LockSupport.parkNanos(50_000_000L)
+                        continue
+                    }
 
                     // underrun logging (API 24+)
                     val uc = at.underrunCount
@@ -270,7 +287,21 @@ class NativeAudioEngine(context: Context) {
                 } else {
                     // Not playing: stop the track cleanly and park until a command arrives.
                     if (trackPlaying) {
-                        try { at.pause(); at.flush() } catch (e: IllegalStateException) { Log.e(TAG, "track.pause/flush", e) }
+                        // stop() in MODE_STREAM plays out what is already buffered (the stop-fade tail);
+                        // wait (bounded) for it to drain, then flush so the next play() starts clean.
+                        try {
+                            at.stop()
+                            var last = at.playbackHeadPosition
+                            var stable = 0
+                            var waited = 0L
+                            while (waited < 300_000_000L && stable < 3) {
+                                LockSupport.parkNanos(5_000_000L)
+                                waited += 5_000_000L
+                                val h = at.playbackHeadPosition
+                                if (h == last) stable++ else { stable = 0; last = h }
+                            }
+                            at.flush()
+                        } catch (e: IllegalStateException) { Log.e(TAG, "track.stop/flush", e) }
                         trackPlaying = false
                     }
                     publishSnapshot()
@@ -290,22 +321,37 @@ class NativeAudioEngine(context: Context) {
     }
 
     private fun buildTrack(): AudioTrack {
-        val attrs = AudioAttributes.Builder()
+        val attrsBuilder = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-            .build()
+        // Binaural beats need L and R kept fully separate. Ask the platform Spatializer to stay out.
+        if (Build.VERSION.SDK_INT >= 32) {
+            attrsBuilder.setSpatializationBehavior(AudioAttributes.SPATIALIZATION_BEHAVIOR_NEVER)
+        }
+        val attrs = attrsBuilder.build()
         val format = AudioFormat.Builder()
             .setSampleRate(sampleRate)
             .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
             .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
             .build()
         // AudioTrack.Builder is API 23+; minSdk is 24 so no legacy fallback needed.
-        return AudioTrack.Builder()
+        val builder = AudioTrack.Builder()
             .setAudioAttributes(attrs)
             .setAudioFormat(format)
             .setBufferSizeInBytes(trackBufBytes)
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        // LOW_LATENCY routes the track to the fast mixer. That path skips the vendor output
+        // effects (Dolby Atmos "immersive sound" on Xiaomi/POCO) which cross-mix L and R and
+        // turn a binaural beat into an audible amplitude pulse.
+        if (Build.VERSION.SDK_INT >= 26) {
+            builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+        }
+        val t = builder.build()
+        if (Build.VERSION.SDK_INT >= 26) {
+            // 1 = LOW_LATENCY granted; 0 = system fell back to the normal (effects) path.
+            Log.i(TAG, "AudioTrack performanceMode=${t.performanceMode} rate=$sampleRate")
+        }
+        return t
     }
 
     // ============================================================================

@@ -61,14 +61,16 @@ class NativeAudioEngine(context: Context) {
     // One PREALLOCATED render buffer (contract §8). Sized to ~1/8 of the track buffer in frames so
     // we write several times per track buffer for low latency without excessive syscalls.
     private val renderFrames: Int = (trackBufBytes / bytesPerFrame / 8).coerceAtLeast(256)
-    private val floatBuf = FloatArray(renderFrames * channelCount)
+    private val floatBuf = FloatArray(renderFrames * channelCount)      // binaural (direct) bus
+    private val floatBufFx = FloatArray(renderFrames * channelCount)    // everything else (fx) bus
 
     // ---- command queue (serialization point; drained on the render thread) ----
     private val commands = ConcurrentLinkedQueue<Runnable>()
 
     private val running = AtomicBoolean(false)
     private var renderThread: Thread? = null
-    @Volatile private var track: AudioTrack? = null
+    @Volatile private var track: AudioTrack? = null     // direct: binaural only, bypasses Dolby
+    @Volatile private var trackFx: AudioTrack? = null   // fx: all other layers, normal effects path
 
     // ---- volatile snapshots published by the render thread for cross-thread getters ----
     @Volatile private var volElapsed: Double = 0.0
@@ -237,8 +239,12 @@ class NativeAudioEngine(context: Context) {
 
     private fun renderLoop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-        var at = buildTrack()
+        // Two tracks (see buildTrack): direct = binaural only, bypasses Dolby/spatializer;
+        // fx = everything else, goes through the normal effects path (Dolby immersive sound).
+        var at = buildTrack(direct = true)
+        var atFx = buildTrack(direct = false)
         track = at
+        trackFx = atFx
 
         var trackPlaying = false
         var lastUnderrun = 0
@@ -250,21 +256,27 @@ class NativeAudioEngine(context: Context) {
                 if (synth.isPlaying) {
                     if (!trackPlaying) {
                         try { at.play() } catch (e: IllegalStateException) { Log.e(TAG, "track.play", e) }
+                        try { atFx.play() } catch (e: IllegalStateException) { Log.e(TAG, "trackFx.play", e) }
                         trackPlaying = true
                     }
 
-                    synth.render(floatBuf, renderFrames)
+                    synth.render(floatBuf, floatBufFx, renderFrames)
 
                     val written = at.write(floatBuf, 0, renderFrames * channelCount, AudioTrack.WRITE_BLOCKING)
-                    if (written < 0) {
-                        // ERROR_DEAD_OBJECT (audio server restart / route change) etc.: rebuild the track.
-                        Log.e(TAG, "AudioTrack.write error: $written; rebuilding track")
+                    val writtenFx = atFx.write(floatBufFx, 0, renderFrames * channelCount, AudioTrack.WRITE_BLOCKING)
+                    if (written < 0 || writtenFx < 0) {
+                        // ERROR_DEAD_OBJECT (audio server restart / route change) etc.: rebuild BOTH tracks.
+                        Log.e(TAG, "AudioTrack.write error: direct=$written fx=$writtenFx; rebuilding tracks")
                         try {
                             try { at.release() } catch (_: Exception) {}
-                            val nt = buildTrack()
+                            try { atFx.release() } catch (_: Exception) {}
+                            val nt = buildTrack(direct = true)
                             at = nt
                             track = nt
-                            trackPlaying = false // loop calls play() again on the new track
+                            val ntFx = buildTrack(direct = false)
+                            atFx = ntFx
+                            trackFx = ntFx
+                            trackPlaying = false // loop calls play() again on the new tracks
                             lastUnderrun = 0
                         } catch (e: Exception) {
                             Log.e(TAG, "track rebuild failed", e)
@@ -275,9 +287,9 @@ class NativeAudioEngine(context: Context) {
                     }
 
                     // underrun logging (API 24+)
-                    val uc = at.underrunCount
+                    val uc = at.underrunCount + atFx.underrunCount
                     if (uc != lastUnderrun) {
-                        Log.w(TAG, "AudioTrack underruns: $uc")
+                        Log.w(TAG, "AudioTrack underruns (direct+fx): $uc")
                         lastUnderrun = uc
                     }
 
@@ -285,22 +297,26 @@ class NativeAudioEngine(context: Context) {
                     maybeTick(force = false)
                     maybeState()
                 } else {
-                    // Not playing: stop the track cleanly and park until a command arrives.
+                    // Not playing: stop both tracks cleanly and park until a command arrives.
                     if (trackPlaying) {
                         // stop() in MODE_STREAM plays out what is already buffered (the stop-fade tail);
                         // wait (bounded) for it to drain, then flush so the next play() starts clean.
                         try {
                             at.stop()
+                            atFx.stop()
                             var last = at.playbackHeadPosition
+                            var lastFx = atFx.playbackHeadPosition
                             var stable = 0
                             var waited = 0L
                             while (waited < 300_000_000L && stable < 3) {
                                 LockSupport.parkNanos(5_000_000L)
                                 waited += 5_000_000L
                                 val h = at.playbackHeadPosition
-                                if (h == last) stable++ else { stable = 0; last = h }
+                                val hFx = atFx.playbackHeadPosition
+                                if (h == last && hFx == lastFx) stable++ else { stable = 0; last = h; lastFx = hFx }
                             }
                             at.flush()
+                            atFx.flush()
                         } catch (e: IllegalStateException) { Log.e(TAG, "track.stop/flush", e) }
                         trackPlaying = false
                     }
@@ -316,16 +332,28 @@ class NativeAudioEngine(context: Context) {
             try { at.pause() } catch (_: Exception) {}
             try { at.flush() } catch (_: Exception) {}
             try { at.release() } catch (_: Exception) {}
+            try { atFx.pause() } catch (_: Exception) {}
+            try { atFx.flush() } catch (_: Exception) {}
+            try { atFx.release() } catch (_: Exception) {}
             track = null
+            trackFx = null
         }
     }
 
-    private fun buildTrack(): AudioTrack {
+    /**
+     * Builds one of the two output tracks.
+     *  - direct = true: BINAURAL bus. Must keep L and R fully separate, so it bypasses the vendor
+     *    output effects (Dolby Atmos "immersive sound") via SPATIALIZATION_BEHAVIOR_NEVER plus
+     *    PERFORMANCE_MODE_LOW_LATENCY (fast mixer skips the effect chain).
+     *  - direct = false: FX bus (noise, isochronic, audio files). Default path, no spatialization
+     *    opt-out and no performance mode, so Dolby immersive sound still enhances these layers.
+     */
+    private fun buildTrack(direct: Boolean): AudioTrack {
         val attrsBuilder = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         // Binaural beats need L and R kept fully separate. Ask the platform Spatializer to stay out.
-        if (Build.VERSION.SDK_INT >= 32) {
+        if (direct && Build.VERSION.SDK_INT >= 32) {
             attrsBuilder.setSpatializationBehavior(AudioAttributes.SPATIALIZATION_BEHAVIOR_NEVER)
         }
         val attrs = attrsBuilder.build()
@@ -342,14 +370,14 @@ class NativeAudioEngine(context: Context) {
             .setTransferMode(AudioTrack.MODE_STREAM)
         // LOW_LATENCY routes the track to the fast mixer. That path skips the vendor output
         // effects (Dolby Atmos "immersive sound" on Xiaomi/POCO) which cross-mix L and R and
-        // turn a binaural beat into an audible amplitude pulse.
-        if (Build.VERSION.SDK_INT >= 26) {
+        // turn a binaural beat into an audible amplitude pulse. Direct (binaural) track only.
+        if (direct && Build.VERSION.SDK_INT >= 26) {
             builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
         }
         val t = builder.build()
         if (Build.VERSION.SDK_INT >= 26) {
             // 1 = LOW_LATENCY granted; 0 = system fell back to the normal (effects) path.
-            Log.i(TAG, "AudioTrack performanceMode=${t.performanceMode} rate=$sampleRate")
+            Log.i(TAG, "AudioTrack(${if (direct) "direct" else "fx"}) performanceMode=${t.performanceMode} rate=$sampleRate")
         }
         return t
     }

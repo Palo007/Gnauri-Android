@@ -154,11 +154,27 @@ class SynthEngine(val sampleRate: Int) {
      * ONLY hot path — no allocation, no boxing, no string ops. (contract §3, §4)
      */
     fun render(out: FloatArray, frames: Int) {
+        renderCore(out, null, frames)
+    }
+
+    /**
+     * Split-bus render: [outDirect] gets ONLY the binaural voices (played on a track that bypasses
+     * the vendor spatializer / Dolby so L/R stay separate); [outFx] gets everything else (noise,
+     * isochronic, audio files) for the normal effects path. Every gain stage is applied identically
+     * to both buses, so direct + fx == the single-bus render(out, frames) (barring clipping).
+     */
+    fun render(outDirect: FloatArray, outFx: FloatArray, frames: Int) {
+        renderCore(outDirect, outFx, frames)
+    }
+
+    /** If [outFx] is null: single bus (total mix) into [out]. Else: out = binaural bus, outFx = rest. */
+    private fun renderCore(out: FloatArray, outFx: FloatArray?, frames: Int) {
         // silence first so early-return / muted paths are safe
         val n = frames * 2
         var i = 0
         while (i < n) {
             out[i] = 0f
+            if (outFx != null) outFx[i] = 0f
             i++
         }
         val sched = schedule ?: return
@@ -171,8 +187,10 @@ class SynthEngine(val sampleRate: Int) {
 
         var f = 0
         while (f < frames) {
-            var l = 0.0
+            var l = 0.0 // total mix
             var r = 0.0
+            var bl = 0.0 // binaural-only part
+            var br = 0.0
 
             // Read the active/outgoing slots EACH sample: a seek/hot-apply finalize (§4.8) or an
             // end-of-schedule can swap or clear them mid-buffer via advanceTransport().
@@ -188,6 +206,8 @@ class SynthEngine(val sampleRate: Int) {
                 act.renderSample()
                 l += act.outL * busGain
                 r += act.outR * busGain
+                bl += act.binL * busGain
+                br += act.binR * busGain
 
                 // ---- outgoing instance (loop tail) ----
                 val out2 = outgoing
@@ -197,36 +217,41 @@ class SynthEngine(val sampleRate: Int) {
                     out2.renderSample()
                     l += out2.outL * downGain
                     r += out2.outR * downGain
+                    bl += out2.binL * downGain
+                    br += out2.binR * downGain
                 }
             }
 
             // ---- fadeOut30s on the final pass (contract §4.9, index.html:1141-1164) ----
+            var gFade = 1.0
             if (fadeOut30s && loopsLeft <= 1.0) {
                 val fadeDuration = min(30.0, totalTime)
                 val fadeStart = max(0.0, totalTime - fadeDuration)
                 if (cursor >= fadeStart && fadeDuration > 0.0) {
-                    val frac = (1.0 - (cursor - fadeStart) / fadeDuration).coerceIn(0.0, 1.0)
-                    l *= frac
-                    r *= frac
+                    gFade = (1.0 - (cursor - fadeStart) / fadeDuration).coerceIn(0.0, 1.0)
                 }
             }
 
-            // ---- master + per-channel trims (contract §4.6) ----
-            l *= ovMaster
-            r *= ovMaster
-            l *= trimL
-            r *= trimR
-
             // ---- stop-fade linear ramp to zero (contract §4.8) ----
+            var gStop = 1.0
             if (stopFadePos >= 0.0) {
-                val g = (1.0 - (stopFadePos / STOP_FADE)).coerceIn(0.0, 1.0)
-                l *= g
-                r *= g
+                gStop = (1.0 - (stopFadePos / STOP_FADE)).coerceIn(0.0, 1.0)
             }
 
+            // ---- fade, master + per-channel trims (contract §4.6), stop-fade: identical on both buses ----
+            val gl = gFade * ovMaster * trimL * gStop
+            val gr = gFade * ovMaster * trimR * gStop
+
             // ---- final clamp; never NaN/Inf (contract §4.11) ----
-            out[f * 2] = sanitize(l)
-            out[f * 2 + 1] = sanitize(r)
+            if (outFx == null) {
+                out[f * 2] = sanitize(l * gl)
+                out[f * 2 + 1] = sanitize(r * gr)
+            } else {
+                out[f * 2] = sanitize(bl * gl)
+                out[f * 2 + 1] = sanitize(br * gr)
+                outFx[f * 2] = sanitize((l - bl) * gl)
+                outFx[f * 2 + 1] = sanitize((r - br) * gr)
+            }
 
             advanceTransport()
             f++
@@ -506,6 +531,9 @@ internal class Instance(
 ) {
     @JvmField var outL: Double = 0.0
     @JvmField var outR: Double = 0.0
+    /** Binaural-voices-only part of outL/outR (outL - binL = everything else). Used for the split bus. */
+    @JvmField var binL: Double = 0.0
+    @JvmField var binR: Double = 0.0
 
     private val sr: Double = sampleRate.toDouble()
     private val samplePeriod: Double = 1.0 / sr
@@ -629,6 +657,8 @@ internal class Instance(
     fun renderSample() {
         var l = 0.0
         var r = 0.0
+        var bl = 0.0
+        var br = 0.0
         val t = posSec
 
         for (vi in 0 until nVoices) {
@@ -653,14 +683,20 @@ internal class Instance(
                         val mono = aL + aR
                         l += mono
                         r += mono
+                        bl += mono
+                        br += mono
                     } else {
                         // hard L/R, swap per stereoswap (index.html:1104-1108)
                         if (stereoswap) {
                             l += aR
                             r += aL
+                            bl += aR
+                            br += aL
                         } else {
                             l += aL
                             r += aR
+                            bl += aL
+                            br += aR
                         }
                     }
                 }
@@ -741,6 +777,8 @@ internal class Instance(
 
         outL = l
         outR = r
+        binL = bl
+        binR = br
         posSec += samplePeriod
     }
 

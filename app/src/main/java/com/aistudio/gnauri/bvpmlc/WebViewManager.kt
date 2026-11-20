@@ -118,6 +118,10 @@ object WebViewManager {
                         exportData = xml
                         createDocumentLauncher?.launch(filename)
                     }
+
+                    /** App version from Gradle (versionName), shown in the page footer. */
+                    @JavascriptInterface
+                    fun appVersion(): String = BuildConfig.VERSION_NAME
                 }, "AndroidBridge")
 
                 // Native audio command surface (contract §5.1). These @JavascriptInterface methods

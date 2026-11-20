@@ -583,11 +583,11 @@
   </div>
 </div>
 
-<footer>Gnauri <span id="ver">v2.2</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
+<footer>Gnauri <span id="ver">v2.4.6</span> · runs fully offline · use headphones for binaural beats · not a medical device</footer>
 
 <script>
 /* Build version — stamped on every substantive edit (see CLAUDE.md). */
-const APP_VERSION = "v2.4.5";
+const APP_VERSION = "v2.4.6";
 
 /* ============================ Gnaural file parser ============================
    .gnaural files are XML. Schema (Gnaural 1.x / Java):
@@ -2772,7 +2772,8 @@ $("exportBtn").onclick=exportGnaural;
 $("exportM4aBtn").onclick=exportM4a;
 
 // stamp build version into the footer
-$("ver").textContent=APP_VERSION;
+// Prefer the real versionName from the Android build; fall back to APP_VERSION in a browser.
+$("ver").textContent=(()=>{try{const v=window.AndroidBridge&&window.AndroidBridge.appVersion();if(v)return "v"+v;}catch(e){}return APP_VERSION;})();
 
 // service worker
 if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
